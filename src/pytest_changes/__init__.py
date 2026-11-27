@@ -1,4 +1,4 @@
-"""Assert that a block of code changes a value, like RSpec's `change` matcher."""
+"""Assert that a block of code changes a value."""
 
 from ._core import ChangeAssertionError, ChangeContext, changes, unchanged
 

@@ -1,6 +1,6 @@
 # pytest-changes
 
-RSpec's `change` matcher for Python: `changes` / `unchanged` context managers.
+Assert that a block of code changes a value: `changes` / `unchanged` context managers.
 Design brief: [Build brief: Python change-block assertions](https://claude.ai/artifact/D41uJUE6VB6CxKTnz2ZBLE)
 
 ## Gate

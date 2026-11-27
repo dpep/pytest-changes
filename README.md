@@ -1,6 +1,6 @@
 pytest-changes
 ======
-Assert that a block of code changes a value, like RSpec's `change` matcher.
+Assert that a block of code changes a value.
 
 ```python
 from pytest_changes import changes
@@ -74,6 +74,8 @@ assert c.after[-1] is item  # also c.before, c.delta
 ```
 
 Only the values before and after the block are compared. An exception raised inside the block propagates unchanged, and nothing is checked.
+
+Inspired by RSpec's [`change`](https://rspec.info/features/3-13/rspec-expectations/built-in-matchers/change) matcher.
 
 ----
 [![installs](https://img.shields.io/pypi/dm/pytest-changes?label=installs)](https://pypi.org/project/pytest-changes)
