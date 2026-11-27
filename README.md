@@ -9,7 +9,7 @@ with changes(cart, "total", to=20):
     cart.add(item)
 ```
 ```
-AssertionError: <Cart>.total: expected → 20, got 0 → 15 (Δ +15)
+AssertionError: cart.total: expected → 20, got 0 → 15 (Δ +15)
 ```
 
 
@@ -62,8 +62,8 @@ with (
 ```
 ```
 AssertionError: 2 change expectations failed
-  ✗ <Cart>.total   expected Δ +20, got Δ +15 (0 → 15)
-  ✗ <Audit>.count  expected no change, got 4 → 5 (Δ +1)
+  ✗ cart.total   expected Δ +20, got Δ +15 (0 → 15)
+  ✗ audit.count  expected no change, got 4 → 5 (Δ +1)
 ```
 
 Inspect the values afterward:
