@@ -1,0 +1,188 @@
+import pytest
+
+from pytest_changes import ChangeAssertionError, changes
+
+
+class Counter:
+    def __init__(self, value=0):
+        self.value = value
+
+
+@pytest.fixture
+def counter():
+    return Counter()
+
+
+def message(excinfo):
+    return str(excinfo.value)
+
+
+class TestAnyChange:
+    def test_passes_when_value_changes(self, counter):
+        with changes(counter, "value"):
+            counter.value += 1
+
+    def test_fails_when_value_stays(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value"):
+            pass
+        assert message(e) == "<Counter>.value: expected to change, stayed 0"
+
+
+class TestTo:
+    def test_passes(self, counter):
+        with changes(counter, "value", to=20):
+            counter.value = 20
+
+    def test_wrong_end(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", to=20):
+            counter.value = 15
+        assert message(e) == "<Counter>.value: expected → 20, got 0 → 15 (Δ +15)"
+
+    def test_strings(self):
+        user = Counter("pending")
+        with pytest.raises(ChangeAssertionError) as e, changes(user, "value", to="active"):
+            user.value = "banned"
+        assert message(e) == "<Counter>.value: expected → 'active', got 'pending' → 'banned'"
+
+    def test_requires_a_change(self):
+        user = Counter("active")
+        with pytest.raises(ChangeAssertionError) as e, changes(user, "value", to="active"):
+            pass
+        assert message(e) == "<Counter>.value: expected → 'active', stayed 'active'"
+
+
+class TestBy:
+    def test_passes(self, counter):
+        with changes(counter, "value", by=20):
+            counter.value += 20
+
+    def test_fails(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by=20):
+            counter.value += 15
+        assert message(e) == "<Counter>.value: expected Δ +20, got Δ +15 (0 → 15)"
+
+    def test_negative(self, counter):
+        with changes(counter, "value", by=-1):
+            counter.value -= 1
+
+    def test_zero_passes_without_change(self, counter):
+        with changes(counter, "value", by=0):
+            pass
+
+    def test_at_least(self):
+        queue = Counter(3)
+        with pytest.raises(ChangeAssertionError) as e, changes(queue, "value", by_at_least=1):
+            pass
+        assert message(e) == "<Counter>.value: expected Δ ≥ +1, did not change (stayed 3)"
+
+    def test_at_most(self):
+        queue = Counter(2)
+        with pytest.raises(ChangeAssertionError) as e, changes(queue, "value", by_at_most=3):
+            queue.value = 7
+        assert message(e) == "<Counter>.value: expected Δ ≤ +3, got Δ +5 (2 → 7)"
+
+    def test_range(self, counter):
+        with changes(counter, "value", by_at_least=1, by_at_most=3):
+            counter.value += 2
+
+    def test_values_that_cannot_subtract(self):
+        user = Counter("a")
+        with (
+            pytest.raises(TypeError, match=r"<Counter>\.value: by= needs after - before.*str"),
+            changes(user, "value", by=1),
+        ):
+            user.value = "b"
+
+    def test_matcher(self):
+        total = Counter(0.1)
+        with changes(total, "value", by=pytest.approx(0.2)):
+            total.value += 0.2
+
+
+class TestGetter:
+    def test_lambda(self, counter):
+        with changes(lambda: counter.value, by=1):
+            counter.value += 1
+
+    def test_lambda_label_falls_back_to_location(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: counter.value):
+            pass
+        assert message(e).startswith("<lambda at test_changes.py:")
+
+    def test_function_label(self, counter):
+        def total():
+            return counter.value
+
+        with pytest.raises(ChangeAssertionError) as e, changes(total):
+            pass
+        assert message(e).startswith("<total at test_changes.py:")
+
+    def test_label_argument(self, counter):
+        with (
+            pytest.raises(ChangeAssertionError) as e,
+            changes(lambda: counter.value, label="counter"),
+        ):
+            pass
+        assert message(e) == "counter: expected to change, stayed 0"
+
+    def test_callable_object_with_attr_uses_attr(self):
+        class Callable:
+            value = 0
+
+            def __call__(self):
+                raise AssertionError("not the getter")
+
+        obj = Callable()
+        with changes(obj, "value", by=1):
+            obj.value += 1
+
+    def test_not_callable(self, counter):
+        with pytest.raises(TypeError, match="callable"):
+            changes(counter)
+
+    def test_getter_error_before_the_block_names_the_label(self):
+        with pytest.raises(ZeroDivisionError) as e, changes(lambda: 1 / 0, label="ratio"):
+            pass
+        assert "ratio" in e.value.__notes__[0]
+        assert "before the block" in e.value.__notes__[0]
+
+    def test_getter_error_after_the_block(self):
+        state = {"ok": True}
+        with pytest.raises(KeyError) as e, changes(lambda: state["ok"], label="state"):
+            del state["ok"]
+        assert "after the block completed" in e.value.__notes__[0]
+
+
+class TestInspect:
+    def test_exposes_before_after_and_delta(self, counter):
+        with changes(counter, "value") as c:
+            counter.value = 3
+        assert (c.before, c.after, c.delta) == (0, 3, 3)
+        assert c.label == "<Counter>.value"
+
+
+class TestBlockErrors:
+    def test_other_exceptions_pass_through_unchecked(self, counter):
+        with pytest.raises(ValueError), changes(counter, "value", by=1):
+            raise ValueError
+
+    def test_plain_assertion_errors_pass_through(self, counter):
+        with pytest.raises(AssertionError) as e, changes(counter, "value", by=1):
+            raise AssertionError("mine")
+        assert type(e.value) is AssertionError
+
+
+class TestInvalidCombos:
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"to": 1, "by": 1},
+            {"to": 1, "by_at_least": 1},
+            {"to": 1, "by_at_most": 1},
+            {"by": 1, "by_at_least": 1},
+            {"by": 1, "by_at_most": 1},
+        ],
+    )
+    def test_raise_at_construction(self, counter, kwargs):
+        with pytest.raises(TypeError):
+            changes(counter, "value", **kwargs)
