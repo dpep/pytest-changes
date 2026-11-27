@@ -18,7 +18,7 @@ AssertionError: <Cart>.total: expected → 20, got 0 → 15 (Δ +15)
 pip install pytest-changes
 ```
 
-Requires Python 3.11+. No dependencies: it raises `AssertionError`, so it works under pytest, unittest or plain scripts.
+Requires Python 3.11+ and pytest 8.4+.
 
 
 ### Usage

@@ -7,7 +7,7 @@ Design brief: [Build brief: Python change-block assertions](https://claude.ai/ar
 `script/check.sh` runs pytest, `ruff check` and `ruff format --check`. Run it before every commit.
 
 ## Constraints
-- Zero runtime dependencies, and never import pytest at runtime: the library must work under unittest and plain `assert`.
+- A pytest plugin: depend on pytest and lean on its machinery (assertion diffs, traceback hiding) rather than rebuilding it.
 - Failure messages are the product. Every message shape has an exact-string test, so change wording on purpose and test it.
 - Compare as `expected == actual`, so matchers (`pytest.approx`, dirty-equals) run their own `__eq__`.
 - Exceptions raised inside the block propagate untouched; only a `ChangeAssertionError` from a stacked context is merged into.
