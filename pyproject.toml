@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pytest-changes"
 dynamic = ["version"]
-description = "assert that a block of code changes a value, like RSpec's change matcher"
+description = "assert that a block of code changes a value"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE.txt"]
