@@ -1,6 +1,6 @@
 import pytest
 
-from pytest_changes import ChangeAssertionError, ChangePreconditionError, changes
+from pytest_changes import ChangeAssertionError, changes
 
 
 class Counter:
@@ -27,39 +27,28 @@ class TestAnyChange:
             pass
         assert message(e) == "<Counter>.value: expected to change, stayed 0"
 
-    def test_from_alone_requires_a_change(self, counter):
-        with pytest.raises(ChangeAssertionError), changes(counter, "value", from_=0):
-            pass
 
-
-class TestFromTo:
+class TestTo:
     def test_passes(self, counter):
-        with changes(counter, "value", from_=0, to=20):
+        with changes(counter, "value", to=20):
             counter.value = 20
 
     def test_wrong_end(self, counter):
-        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", from_=0, to=20):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", to=20):
             counter.value = 15
-        assert message(e) == "<Counter>.value: expected 0 → 20, got 0 → 15 (Δ +15)"
+        assert message(e) == "<Counter>.value: expected → 20, got 0 → 15 (Δ +15)"
 
-    def test_to_alone(self):
+    def test_strings(self):
         user = Counter("pending")
         with pytest.raises(ChangeAssertionError) as e, changes(user, "value", to="active"):
             user.value = "banned"
         assert message(e) == "<Counter>.value: expected → 'active', got 'pending' → 'banned'"
 
-    def test_to_alone_requires_a_change(self):
+    def test_requires_a_change(self):
         user = Counter("active")
         with pytest.raises(ChangeAssertionError) as e, changes(user, "value", to="active"):
             pass
         assert message(e) == "<Counter>.value: expected → 'active', stayed 'active'"
-
-    def test_wrong_start_raises_before_the_block(self, counter):
-        ran = []
-        with pytest.raises(ChangePreconditionError) as e, changes(counter, "value", from_=5, to=20):
-            ran.append(True)
-        assert not ran
-        assert message(e) == "<Counter>.value: expected to start at 5, was 0 (block not run)"
 
 
 class TestBy:
@@ -94,10 +83,6 @@ class TestBy:
 
     def test_range(self, counter):
         with changes(counter, "value", by_at_least=1, by_at_most=3):
-            counter.value += 2
-
-    def test_with_from(self, counter):
-        with changes(counter, "value", from_=0, by=2):
             counter.value += 2
 
     def test_values_that_cannot_subtract(self):
@@ -201,7 +186,3 @@ class TestInvalidCombos:
     def test_raise_at_construction(self, counter, kwargs):
         with pytest.raises(TypeError):
             changes(counter, "value", **kwargs)
-
-    def test_from_equal_to_is_allowed(self, counter):
-        # a matcher can equal from_ by accident, so this is not rejected
-        changes(counter, "value", from_=0, to=0)

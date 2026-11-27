@@ -32,13 +32,6 @@ class ChangeAssertionError(AssertionError):
         return "\n".join(lines)
 
 
-class ChangePreconditionError(AssertionError):
-    """`from_` did not match before the block ran.
-
-    Not a ChangeAssertionError, so stacked contexts skip their checks instead of merging.
-    """
-
-
 class ChangeContext:
     def __init__(
         self,
@@ -46,7 +39,6 @@ class ChangeContext:
         attr: str | None,
         *,
         expect_change: bool,
-        from_: Any = MISSING,
         to: Any = MISSING,
         by: Any = MISSING,
         by_at_least: Any = MISSING,
@@ -72,7 +64,6 @@ class ChangeContext:
         self._get, default_label = _resolve_getter(getter, attr)
         self.label = label if label is not None else default_label
         self._expect_change = expect_change
-        self._from = from_
         self._to = to
         self._by = by
         self._by_at_least = by_at_least
@@ -91,11 +82,6 @@ class ChangeContext:
     def __enter__(self) -> Self:
         __tracebackhide__ = True
         self.before = self._read("before the block")
-        if self._from is not MISSING and self._from != self.before:
-            raise ChangePreconditionError(
-                f"{self.label}: expected to start at {self._from!r}, "
-                f"was {self.before!r} (block not run)"
-            )
         return self
 
     def __exit__(
@@ -142,8 +128,7 @@ class ChangeContext:
         if self._to is not MISSING:
             if changed and self._to == after:
                 return None
-            start = "" if self._from is MISSING else f"{self._from!r} "
-            return f"expected {start}→ {self._to!r}, {self._actual(changed)}"
+            return f"expected → {self._to!r}, {self._actual(changed)}"
 
         return None if changed else f"expected to change, stayed {before!r}"
 
@@ -190,7 +175,6 @@ def changes(
     getter: Any,
     attr: str | None = None,
     *,
-    from_: Any = MISSING,
     to: Any = MISSING,
     by: Any = MISSING,
     by_at_least: Any = MISSING,
@@ -202,7 +186,6 @@ def changes(
         getter,
         attr,
         expect_change=True,
-        from_=from_,
         to=to,
         by=by,
         by_at_least=by_at_least,

@@ -11,5 +11,4 @@ Design brief: [Build brief: Python change-block assertions](https://claude.ai/ar
 - Failure messages are the product. Every message shape has an exact-string test, so change wording on purpose and test it.
 - Compare as `expected == actual`, so matchers (`pytest.approx`, dirty-equals) run their own `__eq__`.
 - Exceptions raised inside the block propagate untouched; only a `ChangeAssertionError` from a stacked context is merged into.
-- `ChangePreconditionError` is deliberately not a `ChangeAssertionError`: stacked contexts skip their checks on it, since the block never ran.
 - Library frames set `__tracebackhide__` so pytest tracebacks end at the user's `with` line.

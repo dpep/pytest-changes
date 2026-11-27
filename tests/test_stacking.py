@@ -1,6 +1,6 @@
 import pytest
 
-from pytest_changes import ChangeAssertionError, ChangePreconditionError, changes, unchanged
+from pytest_changes import ChangeAssertionError, changes, unchanged
 
 
 class Cart:
@@ -25,7 +25,7 @@ def test_reports_every_failure_in_source_order():
     cart, audit = Cart(), Audit()
     with (
         pytest.raises(ChangeAssertionError) as e,
-        changes(cart, "total", from_=0, to=20, label="cart.total"),
+        changes(cart, "total", to=20, label="cart.total"),
         changes(lambda: len(cart.items), by=1, label="len(cart.items)"),
         unchanged(audit, "count", label="audit.count"),
     ):
@@ -35,18 +35,7 @@ def test_reports_every_failure_in_source_order():
 
     assert str(e.value) == (
         "2 change expectations failed\n"
-        "  ✗ cart.total   expected 0 → 20, got 0 → 15 (Δ +15)\n"
+        "  ✗ cart.total   expected → 20, got 0 → 15 (Δ +15)\n"
         "  ✗ audit.count  expected no change, got 4 → 5 (Δ +1)"
     )
     assert len(e.value.failures) == 2
-
-
-def test_precondition_failure_skips_outer_checks():
-    cart = Cart()
-    with (
-        pytest.raises(ChangePreconditionError) as e,
-        changes(cart, "total", by=1),
-        changes(cart, "total", from_=5),
-    ):
-        pass
-    assert "expected to start at 5" in str(e.value)

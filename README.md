@@ -5,11 +5,11 @@ Assert that a block of code changes a value, like RSpec's `change` matcher.
 ```python
 from pytest_changes import changes
 
-with changes(cart, "total", from_=0, to=20):
+with changes(cart, "total", to=20):
     cart.add(item)
 ```
 ```
-AssertionError: <Cart>.total: expected 0 → 20, got 0 → 15 (Δ +15)
+AssertionError: <Cart>.total: expected → 20, got 0 → 15 (Δ +15)
 ```
 
 
@@ -22,7 +22,7 @@ Requires Python 3.11+. No dependencies: it raises `AssertionError`, so it works 
 
 
 ### Usage
-Pass an object and attribute name, or a zero-argument getter:
+Pass an object and attribute name, or a zero-argument getter. With no constraint, the value just has to change:
 ```python
 changes(cart, "total")
 changes(lambda: len(queue))
@@ -30,14 +30,13 @@ changes(lambda: len(queue))
 
 Constraints are keyword arguments:
 ```python
-changes(cart, "total", from_=0, to=20)  # exact transition
 changes(user, "status", to="active")  # end value; must also change
 changes(queue, "size", by=1)  # after - before
 changes(queue, "size", by_at_least=1)
 changes(queue, "size", by_at_most=3)
 ```
 
-`to` can't combine with `by*`. A wrong `from_` raises `ChangePreconditionError` before the block runs.
+`to` can't combine with `by*`.
 
 Values compare with `==`, expected value first, so matchers work:
 ```python
