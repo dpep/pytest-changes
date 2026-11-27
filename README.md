@@ -66,6 +66,13 @@ AssertionError: 2 change expectations failed
   ✗ audit.count  expected no change, got 4 → 5 (Δ +1)
 ```
 
+Values too long to read on one line get pytest's own explanation, as if you'd written `assert after == expected`, and `-v`/`-vv` show more:
+```
+AssertionError: cart.items: expected → [0, 1, 2, 3, 4, 5,...6, 27, 28, 29, 99], got [0, 1, 2, 3, 4, 5,...5, 26, 27, 28, 29] → [0, 1, 2, 3, 4, 5,...6, 27, 28, 29, 30]
+  At index 30 diff: 30 != 99
+  Use -v to get more diff
+```
+
 Inspect the values afterward:
 ```python
 with changes(cart, "items") as c:
