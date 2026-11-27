@@ -6,6 +6,8 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Any, Self
 
+from ._snapshot import snapshot
+
 
 class _Missing:
     def __repr__(self) -> str:
@@ -81,7 +83,8 @@ class ChangeContext:
 
     def __enter__(self) -> Self:
         __tracebackhide__ = True
-        self.before = self._read("before the block")
+        # after is read and compared at once, so only before needs protecting from the block
+        self.before = snapshot(self._read("before the block"))
         return self
 
     def __exit__(
