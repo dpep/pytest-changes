@@ -20,7 +20,7 @@ class TestInPlaceMutation:
         cart = Cart()
         with pytest.raises(ChangeAssertionError) as e, unchanged(cart, "items"):
             cart.items.append("x")
-        assert str(e.value) == "<Cart>.items: expected no change, got [] → ['x']"
+        assert str(e.value) == "cart.items: expected no change, got [] → ['x']"
 
 
 class Plain:

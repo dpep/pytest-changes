@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import numbers
-import os
 from collections.abc import Callable
 from types import TracebackType
 from typing import Any, Self
 
+from . import _label
 from ._snapshot import snapshot
 
 
@@ -205,19 +205,14 @@ def unchanged(getter: Any, attr: str | None = None, *, label: str | None = None)
 def _resolve_getter(getter: Any, attr: str | None) -> tuple[Callable[[], Any], str]:
     # attr given means object form, even when the object is itself callable (e.g. a Mock)
     if attr is not None:
-        return (lambda: getattr(getter, attr)), f"<{type(getter).__name__}>.{attr}"
+        return (lambda: getattr(getter, attr)), _label.label(getter, attr)
 
     if not callable(getter):
         raise TypeError(
             f"changes() needs a callable getter or an object and attribute name, "
             f"got {type(getter).__name__}"
         )
-
-    code = getattr(getter, "__code__", None)
-    if code is None:
-        return getter, repr(getter)
-    name = "lambda" if getter.__name__ == "<lambda>" else getter.__qualname__.rsplit(".", 1)[-1]
-    return getter, f"<{name} at {os.path.basename(code.co_filename)}:{code.co_firstlineno}>"
+    return getter, _label.label(getter, None)
 
 
 def _signed(value: Any) -> str:

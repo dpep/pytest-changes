@@ -18,7 +18,7 @@ def test_fails_when_value_changes():
     audit = Counter(4)
     with pytest.raises(ChangeAssertionError) as e, unchanged(audit, "value"):
         audit.value += 1
-    assert str(e.value) == "<Counter>.value: expected no change, got 4 → 5 (Δ +1)"
+    assert str(e.value) == "audit.value: expected no change, got 4 → 5 (Δ +1)"
 
 
 def test_omits_delta_when_values_cannot_subtract():

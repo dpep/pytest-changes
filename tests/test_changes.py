@@ -25,7 +25,7 @@ class TestAnyChange:
     def test_fails_when_value_stays(self, counter):
         with pytest.raises(ChangeAssertionError) as e, changes(counter, "value"):
             pass
-        assert message(e) == "<Counter>.value: expected to change, stayed 0"
+        assert message(e) == "counter.value: expected to change, stayed 0"
 
 
 class TestTo:
@@ -36,19 +36,19 @@ class TestTo:
     def test_wrong_end(self, counter):
         with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", to=20):
             counter.value = 15
-        assert message(e) == "<Counter>.value: expected → 20, got 0 → 15 (Δ +15)"
+        assert message(e) == "counter.value: expected → 20, got 0 → 15 (Δ +15)"
 
     def test_strings(self):
         user = Counter("pending")
         with pytest.raises(ChangeAssertionError) as e, changes(user, "value", to="active"):
             user.value = "banned"
-        assert message(e) == "<Counter>.value: expected → 'active', got 'pending' → 'banned'"
+        assert message(e) == "user.value: expected → 'active', got 'pending' → 'banned'"
 
     def test_requires_a_change(self):
         user = Counter("active")
         with pytest.raises(ChangeAssertionError) as e, changes(user, "value", to="active"):
             pass
-        assert message(e) == "<Counter>.value: expected → 'active', stayed 'active'"
+        assert message(e) == "user.value: expected → 'active', stayed 'active'"
 
 
 class TestBy:
@@ -59,7 +59,7 @@ class TestBy:
     def test_fails(self, counter):
         with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by=20):
             counter.value += 15
-        assert message(e) == "<Counter>.value: expected Δ +20, got Δ +15 (0 → 15)"
+        assert message(e) == "counter.value: expected Δ +20, got Δ +15 (0 → 15)"
 
     def test_negative(self, counter):
         with changes(counter, "value", by=-1):
@@ -73,13 +73,13 @@ class TestBy:
         queue = Counter(3)
         with pytest.raises(ChangeAssertionError) as e, changes(queue, "value", by_at_least=1):
             pass
-        assert message(e) == "<Counter>.value: expected Δ ≥ +1, did not change (stayed 3)"
+        assert message(e) == "queue.value: expected Δ ≥ +1, did not change (stayed 3)"
 
     def test_at_most(self):
         queue = Counter(2)
         with pytest.raises(ChangeAssertionError) as e, changes(queue, "value", by_at_most=3):
             queue.value = 7
-        assert message(e) == "<Counter>.value: expected Δ ≤ +3, got Δ +5 (2 → 7)"
+        assert message(e) == "queue.value: expected Δ ≤ +3, got Δ +5 (2 → 7)"
 
     def test_range(self, counter):
         with changes(counter, "value", by_at_least=1, by_at_most=3):
@@ -88,7 +88,7 @@ class TestBy:
     def test_values_that_cannot_subtract(self):
         user = Counter("a")
         with (
-            pytest.raises(TypeError, match=r"<Counter>\.value: by= needs after - before.*str"),
+            pytest.raises(TypeError, match=r"user\.value: by= needs after - before.*str"),
             changes(user, "value", by=1),
         ):
             user.value = "b"
@@ -104,10 +104,10 @@ class TestGetter:
         with changes(lambda: counter.value, by=1):
             counter.value += 1
 
-    def test_lambda_label_falls_back_to_location(self, counter):
+    def test_lambda_label(self, counter):
         with pytest.raises(ChangeAssertionError) as e, changes(lambda: counter.value):
             pass
-        assert message(e).startswith("<lambda at test_changes.py:")
+        assert message(e) == "counter.value: expected to change, stayed 0"
 
     def test_function_label(self, counter):
         def total():
@@ -115,7 +115,7 @@ class TestGetter:
 
         with pytest.raises(ChangeAssertionError) as e, changes(total):
             pass
-        assert message(e).startswith("<total at test_changes.py:")
+        assert message(e) == "total(): expected to change, stayed 0"
 
     def test_label_argument(self, counter):
         with (
@@ -158,7 +158,7 @@ class TestInspect:
         with changes(counter, "value") as c:
             counter.value = 3
         assert (c.before, c.after, c.delta) == (0, 3, 3)
-        assert c.label == "<Counter>.value"
+        assert c.label == "counter.value"
 
 
 class TestBlockErrors:
