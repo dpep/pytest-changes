@@ -73,6 +73,19 @@ with changes(cart, "items") as c:
 assert c.after[-1] is item  # also c.before, c.delta
 ```
 
+#### Snapshots
+The value is copied before the block, so mutating it in place counts as a change:
+```python
+with changes(cart, "items"):
+    cart.items.append(item)
+```
+
+Objects without `__eq__` compare by identity, so changing their attributes isn't a change. Write a getter for the state you mean:
+```python
+changes(lambda: vars(user))
+changes(lambda: user.status)
+```
+
 Only the values before and after the block are compared. An exception raised inside the block propagates unchanged, and nothing is checked.
 
 Inspired by RSpec's [`change`](https://rspec.info/features/3-13/rspec-expectations/built-in-matchers/change) matcher.

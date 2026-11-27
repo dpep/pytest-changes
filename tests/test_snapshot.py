@@ -49,6 +49,17 @@ class TestIdentityEquality:
             pass
         assert str(e.value).startswith("items: expected to change, stayed {'a': <")
 
+    def test_attribute_change_is_not_a_change(self):
+        obj = Plain()
+        with pytest.raises(ChangeAssertionError), changes(lambda: obj, label="obj"):
+            obj.status = "active"
+
+    def test_vars_getter_sees_attribute_change(self):
+        obj = Plain()
+        obj.status = "pending"
+        with changes(lambda: vars(obj), to={"status": "active"}, label="obj"):
+            obj.status = "active"
+
     def test_container_mutated_in_place_counts_as_a_change(self):
         items = [Plain()]
         with changes(lambda: items, label="items"):
