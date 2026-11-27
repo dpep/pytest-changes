@@ -26,6 +26,9 @@ Homepage = "https://github.com/dpep/pytest-changes"
 Issues = "https://github.com/dpep/pytest-changes/issues"
 Changelog = "https://github.com/dpep/pytest-changes/blob/main/CHANGELOG.md"
 
+[project.entry-points.pytest11]
+changes = "pytest_changes._plugin"
+
 [dependency-groups]
 dev = [
   "hypothesis",

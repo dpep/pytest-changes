@@ -5,7 +5,7 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Any, Self
 
-from . import _label
+from . import _label, _plugin
 from ._snapshot import snapshot
 
 
@@ -27,10 +27,13 @@ class ChangeAssertionError(AssertionError):
     def __str__(self) -> str:
         if len(self.failures) == 1:
             label, detail = self.failures[0]
-            return f"{label}: {detail}"
+            return f"{label}: {_indent(detail, '  ')}"
         width = max(len(label) for label, _ in self.failures)
         lines = [f"{len(self.failures)} change expectations failed"]
-        lines += [f"  ✗ {label.ljust(width)}  {detail}" for label, detail in self.failures]
+        lines += [
+            f"  ✗ {label.ljust(width)}  {_indent(detail, ' ' * (width + 6))}"
+            for label, detail in self.failures
+        ]
         return "\n".join(lines)
 
 
@@ -119,7 +122,10 @@ class ChangeContext:
         changed = before != after
 
         if not self._expect_change:
-            return None if not changed else f"expected no change, got {self._transition()}"
+            if not changed:
+                return None
+            r, explanation = _plugin.compare(after, before)
+            return _explained(f"expected no change, got {self._transition(r)}", explanation)
 
         if (
             self._by is not MISSING
@@ -131,7 +137,8 @@ class ChangeContext:
         if self._to is not MISSING:
             if changed and self._to == after:
                 return None
-            return f"expected → {self._to!r}, {self._actual(changed)}"
+            r, explanation = _plugin.compare(after, self._to)
+            return _explained(f"expected → {r(self._to)}, {self._actual(changed, r)}", explanation)
 
         return None if changed else f"expected to change, stayed {before!r}"
 
@@ -163,11 +170,11 @@ class ChangeContext:
             return f"expected {expected}, got Δ {_signed(delta)} ({self.before!r} → {self.after!r})"
         return f"expected {expected}, did not change (stayed {self.before!r})"
 
-    def _actual(self, changed: bool) -> str:
-        return f"got {self._transition()}" if changed else f"stayed {self.before!r}"
+    def _actual(self, changed: bool, r: Callable[[Any], str]) -> str:
+        return f"got {self._transition(r)}" if changed else f"stayed {r(self.before)}"
 
-    def _transition(self) -> str:
-        text = f"{self.before!r} → {self.after!r}"
+    def _transition(self, r: Callable[[Any], str]) -> str:
+        text = f"{r(self.before)} → {r(self.after)}"
         delta = self.delta
         if isinstance(delta, numbers.Number) and not isinstance(delta, bool):
             text += f" (Δ {_signed(delta)})"
@@ -222,3 +229,12 @@ def _signed(value: Any) -> str:
         except (TypeError, ValueError):
             pass
     return repr(value)
+
+
+def _explained(headline: str, explanation: list[str]) -> str:
+    return "\n".join([headline, *explanation])
+
+
+def _indent(text: str, prefix: str) -> str:
+    # continuation lines sit under their own headline, so stacked failures stay apart
+    return text.replace("\n", "\n" + prefix)
