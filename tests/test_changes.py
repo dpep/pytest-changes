@@ -81,22 +81,14 @@ class TestBy:
             changes(counter, "value", by=zero)
         assert str(e.value) == f"changes() with by={zero} asserts no change; use unchanged()"
 
-    def test_values_that_cannot_subtract(self):
-        lib = Counter([])
-        with pytest.raises(TypeError) as e, changes(lib, "value", by=1):
-            lib.value = ["book"]
-        assert str(e.value) == (
-            "lib.value: by= needs numbers (list - list failed); "
-            "to count items, use changes(lambda: len(lib.value), by=1)"
-        )
-        assert e.value.__suppress_context__
-
-    def test_unsized_values_that_cannot_subtract(self):
-        user = Counter("a")
-        user.value = object()
+    def test_neither_sized_nor_subtractable(self):
+        user = Counter(object())
         with pytest.raises(TypeError) as e, changes(user, "value", by=1):
             user.value = object()
-        assert str(e.value) == "user.value: by= needs numbers (object - object failed)"
+        assert str(e.value) == (
+            "user.value: by= needs values with a length or that subtract (object - object failed)"
+        )
+        assert e.value.__suppress_context__
 
     def test_cannot_subtract_traceback_ends_at_the_with_line(self, pytester):
         pytester.makepyfile(
@@ -104,9 +96,9 @@ class TestBy:
             from pytest_changes import changes
 
             def test_it():
-                books = []
-                with changes(lambda: books, by=1):
-                    books.append("x")
+                box = [object()]
+                with changes(lambda: box[0], by=1):
+                    box[0] = object()
             """
         )
         result = pytester.runpytest_subprocess()
@@ -118,6 +110,84 @@ class TestBy:
         total = Counter(0.1)
         with changes(total, "value", by=pytest.approx(0.2)):
             total.value += 0.2
+
+
+class TestByLength:
+    def test_counts_items_added(self):
+        books = ["a"]
+        with changes(lambda: books, by=1):
+            books.append("b")
+
+    def test_counts_items_removed(self):
+        books = ["a", "b"]
+        with changes(lambda: books, by=-1):
+            books.pop()
+
+    def test_sets_count_rather_than_subtract(self):
+        tags = {"a"}
+        with changes(lambda: tags, by=1):
+            tags.add("b")
+
+    def test_strings_count_characters(self):
+        log = Counter("ab")
+        with changes(log, "value", by=3):
+            log.value += "cde"
+
+    def test_length_wins_over_subtraction(self):
+        box = Counter(Sized(1))
+        with changes(box, "value", by=1):
+            box.value = Sized(2, sub=100)
+
+    def test_unsized_len_falls_back_to_subtraction(self):
+        # numpy's 0-d arrays define __len__ but raise TypeError from it
+        box = Counter(Unsized(1))
+        with changes(box, "value", by=100):
+            box.value = Unsized(2, sub=100)
+
+    def test_fails_with_lengths(self):
+        lib = Counter(["a", "b", "c"])
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: lib.value, by=1):
+            lib.value += ["d", "e"]
+        assert message(e) == "lib.value: expected Δ +1, got Δ +2 (len 3 → 5)"
+
+    def test_same_length_different_items(self):
+        books = ["a"]
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: books, by=1):
+            books[0] = "b"
+        assert message(e) == "books: expected Δ +1, got Δ +0 (len 1 → 1)"
+
+    def test_did_not_change(self):
+        books = ["a", "b", "c"]
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: books, by=1):
+            pass
+        assert message(e) == "books: expected Δ +1, did not change (len stayed 3)"
+
+    def test_long_values_stay_out_of_the_message(self):
+        books = list(range(100))
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: books, by=1):
+            books.extend([1, 2])
+        assert message(e) == "books: expected Δ +1, got Δ +2 (len 100 → 102)"
+
+
+class Sized:
+    """Sized and subtractable, like a numpy array; `-` returns `sub`."""
+
+    def __init__(self, n, sub=0):
+        self.n, self.sub = n, sub
+
+    def __len__(self):
+        return self.n
+
+    def __sub__(self, other):
+        return self.sub
+
+    def __eq__(self, other):
+        return self.n == other.n
+
+
+class Unsized(Sized):
+    def __len__(self):
+        raise TypeError("len() of unsized object")
 
 
 class TestMessages:
@@ -234,13 +304,21 @@ class TestInspect:
         assert (c.before, c.after, c.delta) == (0, 3, 3)
         assert c.label == "counter.value"
 
-    def test_delta_of_values_that_cannot_subtract_raises(self):
-        shelf = Counter([])
+    def test_delta_counts_items(self):
+        books = ["a"]
+        with changes(lambda: books) as c:
+            books.append("b")
+        assert c.delta == 1
+
+    def test_delta_of_values_neither_sized_nor_subtractable_raises(self):
+        shelf = Counter(None)
         with changes(shelf, "value") as c:
-            shelf.value = ["book"]
+            shelf.value = 1
         with pytest.raises(TypeError) as e:
             c.delta  # noqa: B018
-        assert str(e.value) == "shelf.value: delta needs values that subtract (list - list failed)"
+        assert str(e.value) == (
+            "shelf.value: delta needs values with a length or that subtract (int - NoneType failed)"
+        )
 
     def test_values_are_unset_until_read(self, counter):
         c = changes(counter, "value")

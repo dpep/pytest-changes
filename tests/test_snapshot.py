@@ -164,7 +164,7 @@ class TestInspect:
         tags = {"a"}
         with changes(lambda: tags, label="tags") as c:
             tags.add("b")
-        assert c.delta == {"b"}
+        assert c.delta == 1
 
 
 class Truthless:

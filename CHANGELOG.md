@@ -4,7 +4,8 @@
 - `changes` and `unchanged` context managers. Pass a getter, or an object and attribute name; both are positional-only. Constrain a change with `to` or `by`, which can't be combined.
 - For a bound, check the delta after the block: `assert c.delta >= 1`.
 - `by=0` raises `TypeError`: use `unchanged()`.
-- `c.before`, `c.after` and `c.delta` expose the values. `c.delta` raises `TypeError` when they can't be subtracted. `c.after` raises `AttributeError` until the block exits, or when `changes` skipped its check because the block raised.
+- The delta is `after - before` for numbers, and `len(after) - len(before)` for anything with a length (lists, sets, dicts, strings): `changes(lambda: lib.books, by=1)` passes when one book was added. Failures show the lengths: `expected Δ +1, got Δ +2 (len 3 → 5)`.
+- `c.before`, `c.after` and `c.delta` expose the values. `c.delta` follows the same rule, and raises `TypeError` for values that have no length and can't be subtracted. `c.after` raises `AttributeError` until the block exits, or when `changes` skipped its check because the block raised.
 - When the block raises, `unchanged` still checks: a change fails with a `ChangeAssertionError` chained from the block's exception, and otherwise the exception propagates untouched. `changes` skips its check, since the block didn't finish. `KeyboardInterrupt`, `pytest.skip` and other non-`Exception` errors skip both.
 - Stacked contexts in one `with` report every failed expectation in a single error.
 - The value is snapshotted before the block, so a list or dict mutated in place counts as a change.

@@ -110,13 +110,24 @@ class ChangeContext:
 
     @property
     def delta(self) -> Any:
-        """`after - before`."""
+        """`len(after) - len(before)` for values with a length, else `after - before`."""
+        return self._delta("delta")[0]
+
+    def _delta(self, needed_by: str) -> tuple[Any, bool]:
+        """The delta, and whether it counts items."""
+        __tracebackhide__ = True
         after, before = self.after, self.before
+        # length first: sets subtract too, but by=1 means one more item
         try:
-            return after - before
+            return len(after) - len(before), True
+        except TypeError:
+            pass
+        try:
+            return after - before, False
         except TypeError:
             raise TypeError(
-                f"{self.label}: delta needs values that subtract ({_subtraction(after, before)})"
+                f"{self.label}: {needed_by} needs values with a length or that subtract "
+                f"({type(after).__name__} - {type(before).__name__} failed)"
             ) from None
 
     def __enter__(self) -> Self:
@@ -235,23 +246,19 @@ class ChangeContext:
 
     def _check_delta(self) -> str | None:
         __tracebackhide__ = True
-        try:
-            delta = self.after - self.before
-        except TypeError:
-            message = f"{self.label}: by= needs numbers ({_subtraction(self.after, self.before)})"
-            if hasattr(self.after, "__len__"):
-                message += (
-                    f"; to count items, use changes(lambda: len({self.label}), by={self._by!r})"
-                )
-            raise TypeError(message) from None
-
+        delta, counts = self._delta("by=")
         if equal(self._by, delta):
             return None
         expected = f"Δ {_signed(self._by)}"
+        if counts:
+            before, after = len(self.before), len(self.after)
+        else:
+            before, after = _plugin.short_repr(self.before), _plugin.short_repr(self.after)
         if not equal(self.before, self.after):
-            transition = f"{_plugin.short_repr(self.before)} → {_plugin.short_repr(self.after)}"
+            transition = f"len {before} → {after}" if counts else f"{before} → {after}"
             return f"expected {expected}, got Δ {_signed(delta)} ({transition})"
-        return f"expected {expected}, did not change (stayed {_plugin.short_repr(self.before)})"
+        stayed = f"len stayed {before}" if counts else f"stayed {before}"
+        return f"expected {expected}, did not change ({stayed})"
 
     def _actual(self, changed: bool, r: Callable[[Any], str]) -> str:
         return f"got {self._transition(r)}" if changed else f"stayed {r(self.before)}"
@@ -298,10 +305,6 @@ def _resolve_getter(getter: Any, attr: str | None) -> Callable[[], Any]:
             f"got {type(getter).__name__}"
         )
     return getter
-
-
-def _subtraction(after: Any, before: Any) -> str:
-    return f"{type(after).__name__} - {type(before).__name__} failed"
 
 
 def _signed(value: Any) -> str:
