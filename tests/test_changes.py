@@ -252,16 +252,17 @@ class TestMessages:
             "big.value: expected Δ +1, did not change (stayed 100000000000000000...000000000000000000)"
         )
 
-    def test_timedelta_deltas_read_as_durations(self):
-        elapsed = Counter(timedelta(0))
+    def test_non_number_deltas_use_repr(self):
+        elapsed = Counter(timedelta(hours=5))
         with (
             pytest.raises(ChangeAssertionError) as e,
             changes(elapsed, "value", by=timedelta(hours=1)),
         ):
-            elapsed.value += timedelta(hours=2)
+            elapsed.value -= timedelta(hours=1)
         assert message(e) == (
-            "elapsed.value: expected Δ 1:00:00, got Δ 2:00:00 "
-            "(datetime.timedelta(0) → datetime.timedelta(seconds=7200))"
+            "elapsed.value: expected Δ datetime.timedelta(seconds=3600), "
+            "got Δ datetime.timedelta(days=-1, seconds=82800) "
+            "(datetime.timedelta(seconds=18000) → datetime.timedelta(seconds=14400))"
         )
 
     def test_decimal_deltas_are_signed(self):

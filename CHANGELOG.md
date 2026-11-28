@@ -14,7 +14,7 @@
 - Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError` naming the culprit, the getter's value or `to=`: return a comparable value, such as `lambda: a.tolist()`. In a stacked `with`, the other contexts' failures stay attached as its cause.
 - Failures name the expression as written in the test: `changes(self.cart, "total")` reads `self.cart.total`, `changes(lambda: len(cart.items))` reads `len(cart.items)` and `changes(total)` reads `total()`. Where the source can't be read (such as code run with `exec`), labels fall back to `<Cart>.total` or `<lambda at test_cart.py:12>`. Pass `label=` to name an expectation yourself.
 - Failures on long values (lists, dicts, sets, dataclasses, long strings) include pytest's assertion explanation, honouring `-v`/`-vv`, and the headline shortens those values. Outside a pytest run, messages stay on one line.
-- Deltas read as amounts: `Δ +5`, `Δ +0.50`, `Δ 1:00:00`.
+- Numeric deltas are signed (`Δ +5`, `Δ +0.50`); any other delta shows its repr.
 - Requires pytest 8.4+.
 
 ## 0.0.1 (2026-11-27)

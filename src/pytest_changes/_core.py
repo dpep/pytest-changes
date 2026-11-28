@@ -298,13 +298,13 @@ def _resolve_getter(getter: Any, attr: str | None) -> Callable[[], Any]:
 
 
 def _signed(value: Any) -> str:
-    # deltas read as amounts (+5, 1:00:00); strings keep quotes, since the type is the point
+    # numbers read as amounts (+5); anything else as its repr, like the values beside it
     if isinstance(value, numbers.Number) and not isinstance(value, bool):
         try:
             return format(value, "+")
         except (TypeError, ValueError):
             pass
-    return repr(value) if isinstance(value, (str, bytes)) else str(value)
+    return repr(value)
 
 
 def _explained(headline: str, explanation: list[str]) -> str:
