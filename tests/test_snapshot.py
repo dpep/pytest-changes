@@ -1,8 +1,9 @@
 import threading
+import warnings
 
 import pytest
 
-from pytest_changes import ChangeAssertionError, changes, unchanged
+from pytest_changes import ChangeAssertionError, ChangeWarning, changes, unchanged
 
 
 class Cart:
@@ -27,32 +28,95 @@ class Plain:
     """Compares by identity: a copy never equals the original."""
 
 
+class Account:
+    def __init__(self, balance=100):
+        self.balance = balance
+
+
+class Users:
+    """An ORM-style store: every find() loads a fresh object."""
+
+    def find(self, id):
+        return Account()
+
+
+def hint(type_name, label):
+    return (
+        f"{type_name} compares by identity, so changes to its attributes are invisible: "
+        f"write a getter for the state you mean, e.g. lambda: vars({label})"
+    )
+
+
+HOLDS = (
+    "holds values that compare by identity, so changes to their attributes are invisible: "
+    "write a getter for the state you mean"
+)
+
+
 class TestIdentityEquality:
-    def test_object_left_alone_is_unchanged(self):
+    def test_unchanged_warns_that_attribute_changes_are_invisible(self):
+        acct = Account()
+        with pytest.warns(ChangeWarning) as record, unchanged(lambda: acct):
+            acct.balance = 999
+        assert [str(w.message) for w in record] == [f"acct: {hint('Account', 'acct')}"]
+        assert record[0].filename == __file__
+
+    def test_unchanged_warns_for_a_container(self):
+        accounts = [Account()]
+        with pytest.warns(ChangeWarning) as record, unchanged(lambda: accounts):
+            accounts[0].balance = 999
+        assert [str(w.message) for w in record] == [f"accounts: list {HOLDS}"]
+
+    def test_changes_failure_says_so(self):
         obj = Plain()
-        with unchanged(lambda: obj, label="obj"):
-            pass
-
-    def test_object_left_alone_fails_changes(self):
-        obj = Plain()
-        with pytest.raises(ChangeAssertionError), changes(lambda: obj, label="obj"):
-            pass
-
-    def test_container_left_alone_is_unchanged(self):
-        items = [Plain()]
-        with unchanged(lambda: items, label="items"):
-            pass
-
-    def test_container_left_alone_fails_changes(self):
-        items = {"a": Plain()}
-        with pytest.raises(ChangeAssertionError) as e, changes(lambda: items, label="items"):
-            pass
-        assert str(e.value).startswith("items: expected to change, stayed {'a': <")
-
-    def test_attribute_change_is_not_a_change(self):
-        obj = Plain()
-        with pytest.raises(ChangeAssertionError), changes(lambda: obj, label="obj"):
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: obj):
             obj.status = "active"
+        assert str(e.value).splitlines()[1] == f"  {hint('Plain', 'obj')}"
+
+    def test_container_changes_failure_says_so(self):
+        items = {"a": Plain()}
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: items):
+            pass
+        headline, line = str(e.value).splitlines()
+        assert headline.startswith("items: expected to change, stayed {'a': <")
+        assert line == f"  dict {HOLDS}"
+
+    def test_fresh_object_warns_on_changes(self):
+        db = Users()
+        with pytest.warns(ChangeWarning) as record, changes(lambda: db.find(1)):
+            pass
+        assert [str(w.message) for w in record] == [
+            (
+                "db.find(1): Account compares by identity, so a fresh object counts as a change "
+                "even if its state is the same: write a getter for the state you mean, "
+                "e.g. lambda: vars(db.find(1))"
+            )
+        ]
+
+    def test_fresh_object_failure_on_unchanged_says_so(self):
+        db = Users()
+        with pytest.raises(ChangeAssertionError) as e, unchanged(lambda: db.find(1)):
+            pass
+        assert (
+            str(e.value)
+            .splitlines()[1]
+            .startswith("  Account compares by identity, so a fresh object counts as a change")
+        )
+
+    def test_replaced_by_another_type_is_silent(self):
+        box = {"value": Plain()}
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            with changes(lambda: box["value"], label="value"):
+                box["value"] = None
+
+    def test_constraints_are_silent(self):
+        old, new = Plain(), Plain()
+        box = {"value": old}
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            with changes(lambda: box["value"], to=new, label="value"):
+                box["value"] = new
 
     def test_vars_getter_sees_attribute_change(self):
         obj = Plain()
@@ -62,10 +126,19 @@ class TestIdentityEquality:
 
     def test_container_mutated_in_place_counts_as_a_change(self):
         items = [Plain()]
-        with changes(lambda: items, label="items"):
-            items.append(Plain())
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            with changes(lambda: items, label="items"):
+                items.append(Plain())
+
+    def test_nan_is_not_identity(self):
+        nan = float("nan")
+        with pytest.raises(ChangeAssertionError) as e, unchanged(lambda: nan):
+            pass
+        assert str(e.value) == "nan: expected no change, got nan → nan (Δ +nan)"
 
 
+@pytest.mark.filterwarnings("ignore::pytest_changes.ChangeWarning")  # locks compare by identity
 class TestUncopyable:
     def test_lock(self):
         lock = threading.Lock()

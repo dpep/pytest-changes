@@ -28,15 +28,6 @@ def test_omits_delta_when_values_cannot_subtract():
     assert str(e.value) == "user: expected no change, got 'a' → 'b'"
 
 
-def test_same_object_counts_as_unchanged():
-    class Plain:
-        pass
-
-    obj = Plain()
-    with unchanged(lambda: obj):
-        pass
-
-
 class InsufficientFunds(Exception):
     pass
 
