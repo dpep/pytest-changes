@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest import mock
 
 import pytest
 
@@ -75,15 +76,21 @@ class TestBy:
         with changes(counter, "value", by=-1):
             counter.value -= 1
 
-    @pytest.mark.parametrize("zero", [0, 0.0])
+    @pytest.mark.parametrize("zero", [0, 0.0, Decimal(0)], ids=repr)
     def test_zero_raises_at_construction(self, counter, zero):
         with pytest.raises(TypeError) as e:
             changes(counter, "value", by=zero)
-        assert str(e.value) == f"changes() with by={zero} asserts no change; use unchanged()"
+        assert str(e.value) == f"changes() with by={zero!r} asserts no change; use unchanged()"
 
-    def test_matcher_for_zero_raises_at_construction(self, counter):
-        with pytest.raises(TypeError, match=r"asserts no change; use unchanged\(\)"):
-            changes(counter, "value", by=pytest.approx(0))
+    @pytest.mark.parametrize(
+        ("start", "by"),
+        [(0, pytest.approx(0, abs=1)), (0, mock.ANY), (timedelta(0), timedelta(0))],
+        ids=["approx", "ANY", "timedelta"],
+    )
+    def test_non_numbers_that_equal_zero_are_allowed(self, start, by):
+        box = Counter(start)
+        with changes(box, "value", by=by):
+            pass
 
     def test_neither_sized_nor_subtractable(self):
         user = Counter(object())

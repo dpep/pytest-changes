@@ -58,7 +58,7 @@ class ChangeContext:
             raise TypeError("changes() cannot combine to and by")
         if isinstance(by, range) and not by:
             raise ValueError(f"changes() with by={by!r} can never pass: {by!r} is empty")
-        if by is not MISSING and equal(by, 0):
+        if isinstance(by, numbers.Number) and by == 0:
             raise TypeError(f"changes() with by={by!r} asserts no change; use unchanged()")
 
         self._get = _resolve_getter(getter, attr)
