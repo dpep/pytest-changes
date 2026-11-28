@@ -146,6 +146,31 @@ class TestInspect:
         assert (c.before, c.after, c.delta) == (0, 3, 3)
         assert c.label == "counter.value"
 
+    def test_delta_of_values_that_cannot_subtract_raises(self):
+        shelf = Counter([])
+        with changes(shelf, "value") as c:
+            shelf.value = ["book"]
+        with pytest.raises(TypeError) as e:
+            c.delta  # noqa: B018
+        assert str(e.value) == "shelf.value: delta needs values that subtract (list - list failed)"
+
+    def test_values_are_unset_until_read(self, counter):
+        c = changes(counter, "value")
+        with pytest.raises(AttributeError, match="read when the with block is entered"):
+            c.before  # noqa: B018
+        with c:
+            counter.value = 1
+            with pytest.raises(AttributeError, match="read when the with block exits"):
+                c.after  # noqa: B018
+            with pytest.raises(AttributeError, match="read when the with block exits"):
+                c.delta  # noqa: B018
+
+    def test_after_is_unset_when_the_block_raises(self, counter):
+        with pytest.raises(ValueError), changes(counter, "value") as c:
+            raise ValueError
+        assert c.before == 0
+        assert not hasattr(c, "after")
+
 
 class TestBlockErrors:
     def test_other_exceptions_pass_through_unchecked(self, counter):

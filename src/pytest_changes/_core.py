@@ -62,8 +62,8 @@ class ChangeContext:
         self._expect_change = expect_change
         self._to = to
         self._by = by
-        self.before: Any = MISSING
-        self.after: Any = MISSING
+        self._before: Any = MISSING
+        self._after: Any = MISSING
 
     @functools.cached_property
     def label(self) -> str:
@@ -71,17 +71,34 @@ class ChangeContext:
         return self._pending_label.resolve()
 
     @property
+    def before(self) -> Any:
+        """The value read (and snapshotted) when the block was entered."""
+        if self._before is MISSING:
+            raise AttributeError("before isn't set: it's read when the with block is entered")
+        return self._before
+
+    @property
+    def after(self) -> Any:
+        """The value read when the block exited."""
+        if self._after is MISSING:
+            raise AttributeError("after isn't set: it's read when the with block exits")
+        return self._after
+
+    @property
     def delta(self) -> Any:
-        """`after - before`, or MISSING when the values can't be subtracted."""
+        """`after - before`."""
+        after, before = self.after, self.before
         try:
-            return self.after - self.before
+            return after - before
         except TypeError:
-            return MISSING
+            raise TypeError(
+                f"{self.label}: delta needs values that subtract ({_subtraction(after, before)})"
+            ) from None
 
     def __enter__(self) -> Self:
         __tracebackhide__ = True
         # after is read and compared at once, so only before needs protecting from the block
-        self.before = snapshot(self._read("before the block"))
+        self._before = snapshot(self._read("before the block"))
         return self
 
     def __exit__(
@@ -94,7 +111,7 @@ class ChangeContext:
         if exc is not None and not isinstance(exc, ChangeAssertionError):
             return
 
-        self.after = self._read("after the block completed")
+        self._after = self._read("after the block completed")
         detail = self._check()
         if detail is None:
             return
@@ -112,7 +129,7 @@ class ChangeContext:
             raise
 
     def _check(self) -> str | None:
-        before, after = self.before, self.after
+        before, after = self._before, self._after
         changed = before != after
 
         if not self._expect_change:
@@ -153,7 +170,10 @@ class ChangeContext:
 
     def _transition(self, r: Callable[[Any], str]) -> str:
         text = f"{r(self.before)} → {r(self.after)}"
-        delta = self.delta
+        try:
+            delta = self.after - self.before
+        except TypeError:
+            return text
         if isinstance(delta, numbers.Number) and not isinstance(delta, bool):
             text += f" (Δ {_signed(delta)})"
         return text
@@ -190,6 +210,10 @@ def _resolve_getter(getter: Any, attr: str | None) -> Callable[[], Any]:
             f"got {type(getter).__name__}"
         )
     return getter
+
+
+def _subtraction(after: Any, before: Any) -> str:
+    return f"{type(after).__name__} - {type(before).__name__} failed"
 
 
 def _signed(value: Any) -> str:

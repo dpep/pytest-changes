@@ -2,6 +2,7 @@
 
 ## Unreleased
 - `changes` and `unchanged` context managers with `to` and `by` constraints; the getter (or object and attribute name) is positional-only. To bound a change, check the delta afterwards: `assert c.delta >= 1`. `by=0` raises `TypeError`: use `unchanged()`.
+- `c.before`, `c.after` and `c.delta` expose the values. `c.delta` raises `TypeError` when they can't be subtracted, and `c.after` raises `AttributeError` until the block has exited (or when `changes` skipped reading it because the block raised).
 - Stacked contexts in one `with` report every failed expectation in a single error.
 - Requires pytest 8.4+.
 - The value is snapshotted before the block, so a list or dict mutated in place counts as a change. Objects without `__eq__` still compare by identity: pass a getter such as `lambda: vars(user)` to compare their state.
