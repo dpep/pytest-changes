@@ -16,7 +16,9 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
-    _configs.remove(config)
+    # pytest unconfigures even when another plugin's pytest_configure failed before ours ran
+    if config in _configs:
+        _configs.remove(config)
 
 
 # contexts made or entered by each running test, from setup through the call; innermost
