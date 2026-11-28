@@ -91,7 +91,9 @@ class TestIdentityEquality:
             pass
         assert [str(w.message) for w in record] == [f"the obj: {hint('Plain')}"]
 
-    @pytest.mark.parametrize("value", [Color.RED, Plain, len, hint], ids=repr)
+    @pytest.mark.parametrize(
+        "value", [Color.RED, Plain, len, hint], ids=["enum", "class", "builtin", "function"]
+    )
     def test_values_copied_as_themselves_are_silent(self, value):
         with warnings.catch_warnings():
             warnings.simplefilter("error")

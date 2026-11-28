@@ -44,19 +44,16 @@ class TestUnchecked:
         pytester.makepyfile(UNCHECKED)
         result = pytester.runpytest_subprocess()
         result.assert_outcomes(passed=5, failed=2, warnings=3)
+        # one line at a time, since a plugin such as pytest-randomly may reorder the tests
         result.stdout.fnmatch_lines(
-            [
-                (
-                    "*.py:8: ChangeWarning: changes() was never entered, so it asserts nothing: "
-                    "use it in a with statement"
-                ),
-                "*.py:12: ChangeWarning: unchanged() was never entered*",
-                (
-                    "*.py:16: ChangeWarning: cart.total: wasn't checked because the block raised "
-                    "ValueError: put the expectation outside pytest.raises: "
-                    "with unchanged(...), pytest.raises(ValueError):"
-                ),
-            ]
+            "*.py:8: ChangeWarning: changes() was never entered, so it asserts nothing: "
+            "use it in a with statement"
+        )
+        result.stdout.fnmatch_lines("*.py:12: ChangeWarning: unchanged() was never entered*")
+        result.stdout.fnmatch_lines(
+            "*.py:16: ChangeWarning: cart.total: wasn't checked because the block raised "
+            "ValueError: put the expectation outside pytest.raises: "
+            "with unchanged(...), pytest.raises(ValueError):"
         )
 
     def test_warning_as_error_fails_only_the_tests_that_returned(self, pytester):
@@ -180,20 +177,16 @@ class TestGetterRaised:
         pytester.makepyfile(GETTER_RAISED)
         result = pytester.runpytest_subprocess()
         result.assert_outcomes(passed=2, failed=1, warnings=2)
-        # [[] matches a literal [ in fnmatch
+        # [[] matches a literal [ in fnmatch; one line at a time, in case tests are reordered
         result.stdout.fnmatch_lines(
-            [
-                (
-                    "*.py:6: ChangeWarning: store[[]'count']: wasn't checked because the getter "
-                    "raised KeyError before the block: make the getter return a value before "
-                    "and after the block"
-                ),
-                (
-                    "*.py:11: ChangeWarning: store[[]'count']: wasn't checked because the getter "
-                    "raised KeyError after the block: make the getter return a value before "
-                    "and after the block"
-                ),
-            ]
+            "*.py:6: ChangeWarning: store[[]'count']: wasn't checked because the getter "
+            "raised KeyError before the block: make the getter return a value before "
+            "and after the block"
+        )
+        result.stdout.fnmatch_lines(
+            "*.py:11: ChangeWarning: store[[]'count']: wasn't checked because the getter "
+            "raised KeyError after the block: make the getter return a value before "
+            "and after the block"
         )
 
 
@@ -222,13 +215,17 @@ MADE_AT_IMPORT = """
 class TestMadeAtImport:
     def test_warns_in_the_test_that_entered_it(self, pytester):
         pytester.makepyfile(MADE_AT_IMPORT)
-        result = pytester.runpytest_subprocess("-p", "no:randomly")
+        result = pytester.runpytest_subprocess()
         result.assert_outcomes(passed=5, warnings=2)
-        # [[] matches a literal [ in fnmatch
+        # [[] matches a literal [ in fnmatch; one test at a time, in case tests are reordered
         result.stdout.fnmatch_lines(
             [
                 "*::test_raised[[]ctx0[]]",
                 "*.py:5: ChangeWarning: state[[]'n']: wasn't checked because the block raised*",
+            ]
+        )
+        result.stdout.fnmatch_lines(
+            [
                 "*::test_raised[[]ctx1[]]",
                 "*.py:5: ChangeWarning: same: wasn't checked because the block raised*",
             ]
