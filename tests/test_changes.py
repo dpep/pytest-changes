@@ -116,6 +116,37 @@ class TestBy:
             total.value += 0.2
 
 
+class TestByRange:
+    @pytest.mark.parametrize("step", [1, 3])
+    def test_passes_inside(self, counter, step):
+        with changes(counter, "value", by=range(1, 4)):
+            counter.value += step
+
+    def test_fails_outside(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by=range(1, 4)):
+            counter.value += 4
+        assert message(e) == "counter.value: expected Δ in 1..3, got Δ +4 (0 → 4)"
+
+    def test_negative(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by=range(-3, 0)):
+            pass
+        assert message(e) == "counter.value: expected Δ in -3..-1, did not change (stayed 0)"
+
+    def test_step(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by=range(0, 9, 2)):
+            counter.value += 3
+        assert message(e) == "counter.value: expected Δ in range(0, 9, 2), got Δ +3 (0 → 3)"
+
+    def test_counts_items(self):
+        lib = Counter(["a"])
+        with changes(lib, "value", by=range(1, 3)):
+            lib.value = ["a", "b", "c"]
+
+    def test_empty_raises_at_construction(self, counter):
+        with pytest.raises(ValueError, match=r"range\(3, 1\) is empty"):
+            changes(counter, "value", by=range(3, 1))
+
+
 class TestByLength:
     def test_counts_items_added(self):
         books = ["a"]

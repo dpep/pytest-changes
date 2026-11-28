@@ -59,6 +59,8 @@ class ChangeContext:
     ):
         if to is not MISSING and by is not MISSING:
             raise TypeError("changes() cannot combine to and by")
+        if isinstance(by, range) and not by:
+            raise ValueError(f"changes() with by={by!r} can never pass: {by!r} is empty")
         if by is not MISSING and equal(by, 0):
             raise TypeError(f"changes() with by={by!r} asserts no change; use unchanged()")
 
@@ -244,9 +246,15 @@ class ChangeContext:
     def _check_delta(self) -> str | None:
         __tracebackhide__ = True
         delta, counts = self._delta("by=")
-        if equal(self._by, delta):
+        by = self._by
+        if delta in by if isinstance(by, range) else equal(by, delta):
             return None
-        expected = f"Δ {_signed(self._by)}"
+        if isinstance(by, range) and by.step == 1:
+            expected = f"Δ in {by.start}..{by.stop - 1}"
+        elif isinstance(by, range):
+            expected = f"Δ in {by!r}"
+        else:
+            expected = f"Δ {_signed(by)}"
         if counts:
             before, after = len(self.before), len(self.after)
         else:
