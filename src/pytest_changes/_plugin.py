@@ -19,6 +19,29 @@ def pytest_unconfigure(config: pytest.Config) -> None:
     _configs.remove(config)
 
 
+# contexts constructed by each running test function, innermost (pytester) run last
+_constructed: list[list[Any]] = []
+
+
+def track(context: Any) -> None:
+    if _constructed:
+        _constructed[-1].append(context)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> Any:
+    contexts: list[Any] = []
+    _constructed.append(contexts)
+    try:
+        result = yield
+    finally:
+        _constructed.pop()
+    # only when the test body returned: a test that raised never reached its with lines
+    for context in contexts:
+        context.warn_if_never_entered()
+    return result
+
+
 _LIMIT = 40
 
 

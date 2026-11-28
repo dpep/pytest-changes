@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import numbers
-import sys
 import warnings
 from collections.abc import Callable
 from types import TracebackType
@@ -63,36 +62,37 @@ class ChangeContext:
             raise TypeError(f"changes() with by={by!r} asserts no change; use unchanged()")
 
         self._get = _resolve_getter(getter, attr)
+        self._site = _label.call_site()
         if label is not None:
             self.label = label
         else:
-            self._pending_label = _label.Pending(getter, attr)
+            self._label_args = (getter, attr)
         self._expect_change = expect_change
         self._to = to
         self._by = by
         self._before: Any = MISSING
         self._after: Any = MISSING
-        self._site = _caller_site()
         self._entered = False
+        _plugin.track(self)
 
-    def __del__(self) -> None:
-        # like an un-awaited coroutine: without `with`, nothing is ever checked
-        if getattr(self, "_entered", True):
+    def warn_if_never_entered(self) -> None:
+        """Called by the plugin after the test: like an un-awaited coroutine, it checked nothing."""
+        if self._entered:
             return
-        name = "changes" if self._expect_change else "unchanged"
-        filename, lineno, module = self._site
         warnings.warn_explicit(
-            f"{name}() was never entered, so it asserts nothing: use it in a with statement",
+            f"{self._name}() was never entered, so it asserts nothing: use it in a with statement",
             ChangeWarning,
-            filename,
-            lineno,
-            module,
+            *_label.location(self._site),
         )
+
+    @property
+    def _name(self) -> str:
+        return "changes" if self._expect_change else "unchanged"
 
     @functools.cached_property
     def label(self) -> str:
         """Names the expression in failure messages; read from source only when first needed."""
-        return self._pending_label.resolve()
+        return _label.label(*self._label_args, self._site)
 
     @property
     def before(self) -> Any:
@@ -152,11 +152,10 @@ class ChangeContext:
         if exc is not None and not isinstance(exc, ChangeAssertionError):
             # what pytest.raises is used for; pytest outcomes and KeyboardInterrupt end the test
             if isinstance(exc, Exception | SystemExit):
-                name = "changes" if self._expect_change else "unchanged"
                 error = type(exc).__name__
                 warnings.warn(
                     f"{self.label}: not checked because the block raised {error}: put the "
-                    f"expectation outside pytest.raises: with {name}(...), pytest.raises({error}):",
+                    f"expectation outside pytest.raises: with {self._name}(...), pytest.raises({error}):",
                     ChangeWarning,
                     stacklevel=2,
                 )
@@ -274,13 +273,6 @@ def unchanged(
 ) -> ChangeContext:
     """Assert that the block leaves `getter()` (or `getattr(getter, attr)`) equal to before."""
     return ChangeContext(getter, attr, expect_change=False, label=label)
-
-
-def _caller_site() -> tuple[str, int, str]:
-    frame = sys._getframe(1)
-    while frame.f_back is not None and _label._in_package(frame.f_globals.get("__name__")):
-        frame = frame.f_back
-    return frame.f_code.co_filename, frame.f_lineno, frame.f_globals.get("__name__", "")
 
 
 def _resolve_getter(getter: Any, attr: str | None) -> Callable[[], Any]:

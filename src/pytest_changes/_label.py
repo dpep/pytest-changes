@@ -17,19 +17,6 @@ _Index = tuple[dict[tuple[int, int], ast.Call], dict[int, list[ast.Lambda]]]
 _indexes: dict[str, _Index | None] = {}
 
 
-class Pending:
-    """What naming the expression needs, captured cheaply at the call; resolved on demand."""
-
-    def __init__(self, getter: Any, attr: str | None):
-        self.getter = getter
-        self.attr = attr
-        # a lambda names itself; anything else needs the caller's call site
-        self.site = None if _is_lambda(getter, attr) else _call_site()
-
-    def resolve(self) -> str:
-        return label(self.getter, self.attr, self.site)
-
-
 # the caller's code, instruction offset and globals: enough to find the call, without the frame
 _Site = tuple[CodeType, int, dict[str, Any]]
 
@@ -71,7 +58,8 @@ def _is_lambda(getter: Any, attr: str | None) -> bool:
     return attr is None and getattr(getter, "__name__", None) == "<lambda>"
 
 
-def _call_site() -> _Site | None:
+def call_site() -> _Site | None:
+    """The first frame outside this package, captured cheaply."""
     try:
         frame: FrameType | None = sys._getframe(1)
     except Exception:  # noqa: BLE001 - no frame introspection (non-CPython); fall back
@@ -83,10 +71,24 @@ def _call_site() -> _Site | None:
     return frame.f_code, frame.f_lasti, frame.f_globals
 
 
+def location(site: _Site | None) -> tuple[str, int, str]:
+    """Filename, line and module of a call site, for warnings.warn_explicit."""
+    if site is None:
+        return "<unknown>", 0, ""
+    code, _, module_globals = site
+    line = _position(site)[0] or code.co_firstlineno
+    return code.co_filename, line, module_globals.get("__name__", "")
+
+
+def _position(site: _Site) -> tuple[int | None, int | None, int | None, int | None]:
+    code, lasti, _ = site
+    return next(itertools.islice(code.co_positions(), lasti // 2, None), (None,) * 4)
+
+
 def _find_call(site: _Site) -> ast.Call | None:
-    code, lasti, module_globals = site
-    pos = next(itertools.islice(code.co_positions(), lasti // 2, None), None)
-    if pos is None or None in pos:
+    code, _, module_globals = site
+    pos = _position(site)
+    if None in pos:
         return None
     index = _index(code.co_filename, module_globals)
     # match on the end: a multi-line method call's start is moved to the attribute name

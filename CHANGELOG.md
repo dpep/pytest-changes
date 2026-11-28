@@ -10,7 +10,7 @@
 - Stacked contexts in one `with` report every failed expectation in a single error.
 - The value is snapshotted before the block, so a list or dict mutated in place counts as a change.
 - Without `to=` or `by=`, when the value can't be fully copied (an object without `__eq__`, a container of them, or one holding something uncopyable such as a lock), a pass emits a `pytest_changes.ChangeWarning` and a failure adds the same hint: write a getter for the state you mean, such as `lambda: vars(user)`.
-- A `changes(...)` or `unchanged(...)` never used in a `with` emits a `ChangeWarning` (a `RuntimeWarning`), since it asserts nothing. Under `-W error` the test fails.
+- When a test returns, each `changes(...)` or `unchanged(...)` it made but never used in a `with` emits a `ChangeWarning` (a `RuntimeWarning`) at the call, since it asserts nothing; under `-W error::pytest_changes.ChangeWarning` the test fails.
 - Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`: return a comparable value from the getter, such as `lambda: a.tolist()`.
 - Failures name the expression as written in the test: `changes(self.cart, "total")` reads `self.cart.total`, `changes(lambda: len(cart.items))` reads `len(cart.items)` and `changes(total)` reads `total()`. Where the source can't be read (such as code run with `exec`), labels fall back to `<Cart>.total` or `<lambda at test_cart.py:12>`. Pass `label=` to name an expectation yourself.
 - Failures on long values (lists, dicts, sets, dataclasses, long strings) include pytest's assertion explanation, honouring `-v`/`-vv`, and the headline shortens those values. Outside a pytest run, messages stay on one line.
