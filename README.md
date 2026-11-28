@@ -158,7 +158,7 @@ Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`
 ## Warnings
 A `ChangeWarning` flags two things:
 
-- **Unchecked contexts.** When a test returns, each `changes()` or `unchanged()` made or entered during it (fixtures and `setUp` included) that didn't run its check, because it was never entered or because the block or the getter raised, emits a warning at the line that made it. A reused context's unchecked block is still reported, even if a later block passes. One made at import time and never entered belongs to no test, so it can't warn.
+- **Unchecked contexts.** When a test returns, each `changes()` or `unchanged()` made or entered during it (fixtures and `setUp` included) that didn't run its check, because it was never entered or because the block or the getter raised, emits a warning at the line that made it. A reused context's unchecked block is still reported, even if a later block passes. A context made at import time, outside any test, warns only for blocks a test enters.
 - **Uncopyable values.** Values that can't be fully copied before the block, such as objects without `__eq__` or values holding something uncopyable, such as a lock.
 
 A test that fails stays quiet, so the warning never hides the real failure.

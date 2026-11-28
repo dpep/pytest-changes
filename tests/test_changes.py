@@ -237,6 +237,19 @@ class TestByLength:
         with changes(stock, "value", by=collections.Counter(apple=2)):
             stock.value = collections.Counter(apple=3)
 
+    def test_counter_subclasses_with_their_own_init(self):
+        class Named(collections.Counter):
+            def __init__(self, name, *args, **kwargs):
+                self.name = name
+                super().__init__(*args, **kwargs)
+
+            def __reduce__(self):
+                return (Named, (self.name, dict(self)))
+
+        hits = Named("hits", a=1)
+        with changes(lambda: hits, by=collections.Counter(a=1)):
+            hits["a"] += 1
+
     def test_counter_decreases_count(self):
         # Counter's own `-` drops counts at or below zero, so it would hide the pears
         inv = collections.Counter(apples=1, pears=5)

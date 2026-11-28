@@ -123,7 +123,7 @@ class ChangeContext:
         after, before = self.after, self.before
         if isinstance(after, Counter) and isinstance(before, Counter):
             # Counter's `-` drops counts at or below zero, so it can't say what decreased
-            delta = after.copy()
+            delta = Counter(after)
             delta.subtract(before)
             return delta, False
         if _counts_items(after) and _counts_items(before):
