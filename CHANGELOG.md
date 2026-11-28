@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- A `by=` failure whose delta reads the same as the expectation but isn't equal, such as `Decimal('0.1')` against `by=0.1`, shows both as reprs: `expected Δ 0.1, got Δ Decimal('0.1')`. Pass `by=Decimal('0.1')` to compare Decimals exactly.
+
 ## 0.1.0 (2026-11-27)
 - `changes` and `unchanged` context managers. Pass a getter, or an object and attribute name; both are positional-only. Constrain a change with `to` or `by`, which can't be combined.
 - For lists, tuples, sets and dicts, Δ counts items: `changes(lambda: lib.books, by=1)` passes when one book was added, and failures show the lengths: `expected Δ +1, got Δ +2 (len 3 → 5)`. A `Counter`'s Δ is the signed change in each count (`Counter.subtract`), so `by=Counter(apples=1)` fails when pears also dropped. Everything else, including types with their own `-` such as a vector, is compared with `after - before`. `by` and `c.delta` follow the same rule. Strings raise `TypeError` rather than counting characters: return `int(...)` or `len(...)` from the getter.

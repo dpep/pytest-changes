@@ -282,13 +282,17 @@ class ChangeContext:
             expected = f"Δ in {by!r}"
         else:
             expected = f"Δ {_signed(by)}"
+        got = _signed(delta)
+        if not isinstance(by, range) and got == _signed(by):
+            # equal-looking but unequal (Decimal('0.1') vs 0.1): the reprs show why
+            expected, got = f"Δ {by!r}", repr(delta)
         if counts:
             before, after = len(self.before), len(self.after)
         else:
             before, after = _plugin.short_repr(self.before), _plugin.short_repr(self.after)
         if not equal(self.before, self.after):
             transition = f"len {before} → {after}" if counts else f"{before} → {after}"
-            return f"expected {expected}, got Δ {_signed(delta)} ({transition})"
+            return f"expected {expected}, got Δ {got} ({transition})"
         stayed = f"len stayed {before}" if counts else f"stayed {before}"
         return f"expected {expected}, did not change ({stayed})"
 

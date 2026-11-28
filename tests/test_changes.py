@@ -330,6 +330,15 @@ class Unsized(Sized):
 
 
 class TestMessages:
+    def test_lookalike_deltas_show_their_types(self):
+        # Decimal("0.1") != 0.1: the float is really 0.1000000000000000055...
+        acct = Counter(Decimal(0))
+        with pytest.raises(ChangeAssertionError) as e, changes(acct, "value", by=0.1):
+            acct.value += Decimal("0.1")
+        assert message(e) == (
+            "acct.value: expected Δ 0.1, got Δ Decimal('0.1') (Decimal('0') → Decimal('0.1'))"
+        )
+
     def test_stayed_shortens_long_values(self):
         items = list(range(30))
         with pytest.raises(ChangeAssertionError) as e, changes(lambda: items):
