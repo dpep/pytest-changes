@@ -129,6 +129,7 @@ class ChangeContext:
             raise
 
     def _check(self) -> str | None:
+        __tracebackhide__ = True
         before, after = self._before, self._after
         changed = before != after
 
@@ -150,13 +151,16 @@ class ChangeContext:
         return None if changed else f"expected to change, stayed {before!r}"
 
     def _check_delta(self) -> str | None:
+        __tracebackhide__ = True
         try:
             delta = self.after - self.before
-        except TypeError as e:
-            raise TypeError(
-                f"{self.label}: by= needs after - before, which failed for "
-                f"{type(self.before).__name__} and {type(self.after).__name__}"
-            ) from e
+        except TypeError:
+            message = f"{self.label}: by= needs numbers ({_subtraction(self.after, self.before)})"
+            if hasattr(self.after, "__len__"):
+                message += (
+                    f"; to count items, use changes(lambda: len({self.label}), by={self._by!r})"
+                )
+            raise TypeError(message) from None
 
         if self._by == delta:
             return None

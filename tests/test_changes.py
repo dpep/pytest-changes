@@ -72,12 +72,37 @@ class TestBy:
         assert str(e.value) == f"changes() with by={zero} asserts no change; use unchanged()"
 
     def test_values_that_cannot_subtract(self):
+        lib = Counter([])
+        with pytest.raises(TypeError) as e, changes(lib, "value", by=1):
+            lib.value = ["book"]
+        assert str(e.value) == (
+            "lib.value: by= needs numbers (list - list failed); "
+            "to count items, use changes(lambda: len(lib.value), by=1)"
+        )
+        assert e.value.__suppress_context__
+
+    def test_unsized_values_that_cannot_subtract(self):
         user = Counter("a")
-        with (
-            pytest.raises(TypeError, match=r"user\.value: by= needs after - before.*str"),
-            changes(user, "value", by=1),
-        ):
-            user.value = "b"
+        user.value = object()
+        with pytest.raises(TypeError) as e, changes(user, "value", by=1):
+            user.value = object()
+        assert str(e.value) == "user.value: by= needs numbers (object - object failed)"
+
+    def test_cannot_subtract_traceback_ends_at_the_with_line(self, pytester):
+        pytester.makepyfile(
+            """
+            from pytest_changes import changes
+
+            def test_it():
+                books = []
+                with changes(lambda: books, by=1):
+                    books.append("x")
+            """
+        )
+        result = pytester.runpytest_subprocess()
+        result.assert_outcomes(failed=1)
+        assert "_core.py" not in result.stdout.str()
+        assert "direct cause" not in result.stdout.str()
 
     def test_matcher(self):
         total = Counter(0.1)

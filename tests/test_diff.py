@@ -2,8 +2,6 @@ import pytest
 
 from pytest_changes import ChangeAssertionError, _plugin, changes, unchanged
 
-pytest_plugins = ["pytester"]
-
 
 class Cart:
     def __init__(self, size=30):
