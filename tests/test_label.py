@@ -206,7 +206,7 @@ class TestLazy:
     def test_passing_block_reads_no_source(self, monkeypatch):
         monkeypatch.setattr(_label, "_index", lambda *a: pytest.fail("read source"))
         cart = Cart()
-        with changes(cart, "total", by=1), changes(lambda: cart.total), changes(cart.count, by=0):
+        with changes(cart, "total", by=1), changes(lambda: cart.total), unchanged(cart.count):
             cart.total += 1
 
     def test_resolves_after_the_callers_frame_is_gone(self):

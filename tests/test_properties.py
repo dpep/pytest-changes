@@ -18,7 +18,7 @@ def passes(context, box, after):
     return True
 
 
-@given(st.integers(), st.integers(), st.integers())
+@given(st.integers(), st.integers(), st.integers().filter(bool))
 def test_by_passes_iff_delta_matches(before, after, by):
     box = Box(before)
     assert passes(changes(box, "value", by=by), box, after) == (after - before == by)

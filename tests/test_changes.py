@@ -65,9 +65,11 @@ class TestBy:
         with changes(counter, "value", by=-1):
             counter.value -= 1
 
-    def test_zero_passes_without_change(self, counter):
-        with changes(counter, "value", by=0):
-            pass
+    @pytest.mark.parametrize("zero", [0, 0.0])
+    def test_zero_raises_at_construction(self, counter, zero):
+        with pytest.raises(TypeError) as e:
+            changes(counter, "value", by=zero)
+        assert str(e.value) == f"changes() with by={zero} asserts no change; use unchanged()"
 
     def test_values_that_cannot_subtract(self):
         user = Counter("a")
