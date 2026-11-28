@@ -5,11 +5,18 @@ Assert that a block of code changes a value.
 ```python
 from pytest_changes import changes
 
-with changes(cart, "total", to=20):
+with changes(lambda: cart.total, by=20):
     cart.add(item)
 ```
 ```
-AssertionError: cart.total: expected → 20, got 0 → 15 (Δ +15)
+E       pytest_changes.ChangeAssertionError: cart.total: expected Δ +20, got Δ +15 (0 → 15)
+```
+
+It replaces the familiar before-and-after dance:
+```python
+before = cart.total
+cart.add(item)
+assert cart.total - before == 20
 ```
 
 
@@ -22,28 +29,40 @@ Requires Python 3.11+ and pytest 8.4+.
 
 
 ### Usage
-Pass an object and attribute name, or a zero-argument getter. With no constraint, the value just has to change:
+Pass a zero-argument getter. With no constraint, the value just has to change:
 ```python
-changes(cart, "total")
-changes(lambda: len(queue))
+with changes(lambda: len(cart.items)):
+    cart.add(item)
 ```
 
-Constraints are keyword arguments:
+For an attribute, pass the object and the attribute name as a shorthand:
 ```python
-changes(user, "status", to="active")  # end value; must also change
-changes(queue, "size", by=1)  # after - before
-changes(queue, "size", by_at_least=1)
-changes(queue, "size", by_at_most=3)
+with changes(cart, "total", by=20):
+    cart.add(item)
 ```
 
-`to` can't combine with `by*`.
+Constrain the change with `to` (the end value, which must differ from the start) or `by` (`after - before`). They can't be combined:
+```python
+changes(user, "status", to="active")
+changes(cart, "total", by=20)
+```
 
 Values compare with `==`, expected value first, so matchers work:
 ```python
 changes(account, "balance", by=pytest.approx(0.1))
 ```
 
-Assert nothing changed:
+For a bound, check the delta after the block:
+```python
+with changes(lambda: len(queue)) as c:
+    queue.push_many(jobs)
+assert c.delta >= 1
+```
+
+`c.before` and `c.after` hold the values read on entering and leaving the block, and `c.delta` is `after - before`. It raises `TypeError` when they can't be subtracted.
+
+#### Unchanged
+Assert that nothing changed:
 ```python
 from pytest_changes import unchanged
 
@@ -51,6 +70,20 @@ with unchanged(audit, "count"):
     audit.read()
 ```
 
+`by=0` raises `TypeError`: use `unchanged()` instead.
+
+`unchanged` checks even when the block raises. Pair it with `pytest.raises` to catch an operation that fails but still leaves a mess:
+```python
+with pytest.raises(ValueError), unchanged(lambda: account.balance):
+    account.withdraw(500)
+```
+```
+E       pytest_changes.ChangeAssertionError: account.balance: expected no change, got 100 → -400 (Δ -500)
+```
+
+`changes` skips its check when the block raises, since the operation didn't finish.
+
+#### Stacking
 Stack expectations in one `with`, and every failure is reported:
 ```python
 with (
@@ -61,24 +94,17 @@ with (
     cart.add(item)
 ```
 ```
-AssertionError: 2 change expectations failed
-  ✗ cart.total   expected Δ +20, got Δ +15 (0 → 15)
-  ✗ audit.count  expected no change, got 4 → 5 (Δ +1)
+E       pytest_changes.ChangeAssertionError: 2 change expectations failed
+E         ✗ cart.total   expected Δ +20, got Δ +15 (0 → 15)
+E         ✗ audit.count  expected no change, got 4 → 5 (Δ +1)
 ```
 
-Values too long to read on one line get pytest's own explanation, as if you'd written `assert after == expected`, and `-v`/`-vv` show more:
-```
-AssertionError: cart.items: expected → [0, 1, 2, 3, 4, 5,...6, 27, 28, 29, 99], got [0, 1, 2, 3, 4, 5,...5, 26, 27, 28, 29] → [0, 1, 2, 3, 4, 5,...6, 27, 28, 29, 30]
-  At index 30 diff: 30 != 99
-  Use -v to get more diff
-```
-
-Inspect the values afterward:
+Failures name the expression as you wrote it. Pass `label=` to name it yourself:
 ```python
-with changes(cart, "items") as c:
-    cart.add(item)
-assert c.after[-1] is item  # also c.before, c.delta
+changes(lambda: cart.total, by=20, label="cart total")
 ```
+
+Values too long to read on one line get pytest's own diff, as if you'd written `assert after == expected`, and `-v`/`-vv` show more.
 
 #### Snapshots
 The value is copied before the block, so mutating it in place counts as a change:
@@ -87,13 +113,22 @@ with changes(cart, "items"):
     cart.items.append(item)
 ```
 
-Objects without `__eq__` compare by identity, so changing their attributes isn't a change. Write a getter for the state you mean:
+Objects without `__eq__` compare by identity, so changing their attributes isn't a change. Write a getter for the state you mean, and a `ChangeWarning` flags results that may rest on identity:
 ```python
-changes(lambda: vars(user))
-changes(lambda: user.status)
+changes(lambda: vars(account))
+changes(lambda: account.balance)
+changes(lambda: id(account))  # if identity really is what you mean
 ```
 
-Only the values before and after the block are compared. An exception raised inside the block propagates unchanged, and nothing is checked.
+The same goes for ORM models whose `==` compares primary keys: read the field, as in `changes(lambda: User.objects.get(pk=1).status)`. Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`: return a comparable value, as in `changes(lambda: a.tolist())`.
+
+A `changes()` or `unchanged()` never used in a `with` asserts nothing, so it also emits a `ChangeWarning`.
+
+For async code, use a plain `with` around the `await`:
+```python
+with changes(lambda: cart.total, by=15):
+    await cart.add_async(item)
+```
 
 Inspired by RSpec's [`change`](https://rspec.info/features/3-13/rspec-expectations/built-in-matchers/change) matcher.
 
