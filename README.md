@@ -1,6 +1,6 @@
 pytest-changes
 ======
-Assert that a block of code changes a value.
+Assert value changes.
 
 ```python
 from pytest_changes import changes

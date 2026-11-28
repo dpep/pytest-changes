@@ -1,4 +1,4 @@
-"""Assert that a block of code changes a value."""
+"""Assert value changes."""
 
 from ._core import ChangeAssertionError, ChangeContext, ChangeWarning, changes, unchanged
 

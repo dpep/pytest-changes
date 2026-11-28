@@ -1,6 +1,6 @@
 # pytest-changes
 
-Assert that a block of code changes a value: `changes` / `unchanged` context managers.
+Assert value changes: `changes` / `unchanged` context managers.
 Design brief: [Build brief: Python change-block assertions](https://claude.ai/artifact/D41uJUE6VB6CxKTnz2ZBLE)
 
 ## Gate
