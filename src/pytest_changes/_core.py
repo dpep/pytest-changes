@@ -136,7 +136,7 @@ class ChangeContext:
         # after is read and compared at once, so only before needs protecting from the block
         value = self._read("before the block")
         try:
-            self._before, self._holds_identity = snapshot(value)
+            self._before, self._complete = snapshot(value)
         except Incomparable:
             raise self._incomparable(value) from None
         return self
@@ -165,9 +165,9 @@ class ChangeContext:
         self._after = self._read("after the block")
         try:
             detail = self._check()
-            hint = self._identity_hint()
         except Incomparable:
             raise self._incomparable(self._after) from None
+        hint = self._copy_hint()
         if detail is None:
             if hint is not None:
                 warnings.warn(f"{self.label}: {hint}", ChangeWarning, stacklevel=2)
@@ -180,31 +180,14 @@ class ChangeContext:
             return
         raise ChangeAssertionError(self.label, detail)
 
-    def _identity_hint(self) -> str | None:
-        """Why a before/after comparison may be judging identity rather than state."""
-        if self._to is not MISSING or self._by is not MISSING:
+    def _copy_hint(self) -> str | None:
+        """Without to= or by=, an incomplete snapshot means the comparison may miss the point."""
+        if self._complete or self._to is not MISSING or self._by is not MISSING:
             return None
-        before, after = self._before, self._after
-        kind = type(before).__name__
-        by_identity = type(before).__eq__ is object.__eq__
-        fix = "write a getter for the state you mean"
-        if equal(before, after):
-            if by_identity:
-                return (
-                    f"{kind} compares by identity, so changes to its attributes are invisible: "
-                    f"{fix}, e.g. lambda: vars({self.label})"
-                )
-            if self._holds_identity:
-                return (
-                    f"{kind} holds values that compare by identity, "
-                    f"so changes to their attributes are invisible: {fix}"
-                )
-        elif by_identity and type(after) is type(before):
-            return (
-                f"{kind} compares by identity, so a fresh object counts as a change even if "
-                f"its state is the same: {fix}, e.g. lambda: vars({self.label})"
-            )
-        return None
+        return (
+            f"couldn't fully copy {type(self._before).__name__}, so the comparison may not "
+            "reflect its contents: write a getter for the state you mean"
+        )
 
     def _incomparable(self, value: Any) -> TypeError:
         return TypeError(

@@ -17,21 +17,20 @@ def equal(expected: Any, actual: Any) -> bool:
 
 
 def snapshot(value: Any) -> tuple[Any, bool]:
-    """A copy of `value` that later in-place mutation can't reach, or `value` itself.
+    """A copy of `value` that later in-place mutation can't reach, and whether it is complete.
 
-    Also whether some copy came out unequal: `value` is, or holds, something that
-    compares by identity, so in-place changes to it are invisible.
+    Complete means deepcopy worked and its result is `value` itself or equals it; otherwise
+    the comparison may not see inside `value` (identity equality, an uncopyable part).
     """
-    unequal = False
-    for make_copy in (copy.deepcopy, copy.copy):
-        try:
-            candidate = make_copy(value)
-            if equal(candidate, value):
-                return candidate, unequal
-            # a copy that is the original yet unequal is NaN-like, not identity
-            unequal = unequal or candidate is not value
-        except Incomparable:
-            raise
-        except Exception:  # noqa: BLE001, S112 - copy and __eq__ run arbitrary user code
-            continue
-    return value, unequal
+    try:
+        deep = copy.deepcopy(value)
+    except Exception:  # noqa: BLE001, S110 - copying runs arbitrary user code
+        pass
+    else:
+        if deep is value or equal(deep, value):
+            return deep, True
+    try:
+        shallow = copy.copy(value)
+    except Exception:  # noqa: BLE001
+        return value, False
+    return (shallow if equal(shallow, value) else value), False
