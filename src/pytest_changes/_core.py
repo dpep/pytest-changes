@@ -257,14 +257,7 @@ class ChangeContext:
         return f"got {self._transition(r)}" if changed else f"stayed {r(self.before)}"
 
     def _transition(self, r: Callable[[Any], str]) -> str:
-        text = f"{r(self.before)} → {r(self.after)}"
-        try:
-            delta = self.after - self.before
-        except TypeError:
-            return text
-        if isinstance(delta, numbers.Number) and not isinstance(delta, bool):
-            text += f" (Δ {_signed(delta)})"
-        return text
+        return f"{r(self.before)} → {r(self.after)}"
 
 
 def changes(

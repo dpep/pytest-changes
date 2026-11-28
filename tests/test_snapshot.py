@@ -135,7 +135,7 @@ class TestIdentityEquality:
         nan = float("nan")
         with pytest.raises(ChangeAssertionError) as e, unchanged(lambda: nan):
             pass
-        assert str(e.value) == "nan: expected no change, got nan → nan (Δ +nan)"
+        assert str(e.value) == "nan: expected no change, got nan → nan"
 
 
 @pytest.mark.filterwarnings("ignore::pytest_changes.ChangeWarning")  # locks compare by identity

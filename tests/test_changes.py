@@ -39,7 +39,7 @@ class TestTo:
     def test_wrong_end(self, counter):
         with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", to=20):
             counter.value = 15
-        assert message(e) == "counter.value: expected → 20, got 0 → 15 (Δ +15)"
+        assert message(e) == "counter.value: expected → 20, got 0 → 15"
 
     def test_strings(self):
         user = Counter("pending")

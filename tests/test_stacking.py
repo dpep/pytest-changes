@@ -35,8 +35,8 @@ def test_reports_every_failure_in_source_order():
 
     assert str(e.value) == (
         "2 change expectations failed\n"
-        "  ✗ cart.total   expected → 20, got 0 → 15 (Δ +15)\n"
-        "  ✗ audit.count  expected no change, got 4 → 5 (Δ +1)"
+        "  ✗ cart.total   expected → 20, got 0 → 15\n"
+        "  ✗ audit.count  expected no change, got 4 → 5"
     )
     assert len(e.value.failures) == 2
 
@@ -57,8 +57,8 @@ class TestBlockRaises:
             raise ValueError("boom")
         assert str(e.value) == (
             "2 change expectations failed\n"
-            "  ✗ audit.count      expected no change, got 4 → 5 (Δ +1)\n"
-            "  ✗ len(cart.items)  expected no change, got 0 → 1 (Δ +1)"
+            "  ✗ audit.count      expected no change, got 4 → 5\n"
+            "  ✗ len(cart.items)  expected no change, got 0 → 1"
         )
         assert isinstance(e.value.__cause__, ValueError)
 
@@ -72,7 +72,7 @@ class TestBlockRaises:
         ):
             audit.count += 1
             raise ValueError("boom")
-        assert str(e.value) == "audit.count: expected no change, got 4 → 5 (Δ +1)"
+        assert str(e.value) == "audit.count: expected no change, got 4 → 5"
         assert isinstance(e.value.__cause__, ValueError)
 
     def test_changes_skips_when_a_nested_unchanged_failed_on_a_raise(self):
@@ -82,4 +82,4 @@ class TestBlockRaises:
             with unchanged(audit, "count"):
                 audit.count += 1
                 raise ValueError("boom")
-        assert str(e.value) == "audit.count: expected no change, got 4 → 5 (Δ +1)"
+        assert str(e.value) == "audit.count: expected no change, got 4 → 5"

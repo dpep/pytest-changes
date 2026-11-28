@@ -18,14 +18,7 @@ def test_fails_when_value_changes():
     audit = Counter(4)
     with pytest.raises(ChangeAssertionError) as e, unchanged(audit, "value"):
         audit.value += 1
-    assert str(e.value) == "audit.value: expected no change, got 4 → 5 (Δ +1)"
-
-
-def test_omits_delta_when_values_cannot_subtract():
-    user = Counter("a")
-    with pytest.raises(ChangeAssertionError) as e, unchanged(lambda: user.value, label="user"):
-        user.value = "b"
-    assert str(e.value) == "user: expected no change, got 'a' → 'b'"
+    assert str(e.value) == "audit.value: expected no change, got 4 → 5"
 
 
 class InsufficientFunds(Exception):
@@ -46,7 +39,7 @@ class TestBlockRaises:
             unchanged(acct, "value"),
         ):
             withdraw_buggy(acct, 100)
-        assert str(e.value) == "acct.value: expected no change, got 50 → -50 (Δ -100)"
+        assert str(e.value) == "acct.value: expected no change, got 50 → -50"
         assert isinstance(e.value.__cause__, InsufficientFunds)
 
     def test_no_change_lets_the_error_through_untouched(self):

@@ -94,7 +94,7 @@ class TestObjectAttr:
         assert str(e.value) == (
             "2 change expectations failed\n"
             "  ✗ cart.total   expected Δ +20, got Δ +15 (0 → 15)\n"
-            "  ✗ audit.count  expected no change, got 4 → 5 (Δ +1)"
+            "  ✗ audit.count  expected no change, got 4 → 5"
         )
 
 
