@@ -196,10 +196,31 @@ class TestByLength:
         with changes(log, "value", by=3):
             log.value += "cde"
 
-    def test_a_number_counts_items_even_when_values_subtract(self):
+    def test_own_subtraction_wins_over_length(self):
         box = Counter(Sized(1))
-        with changes(box, "value", by=1):
+        with changes(box, "value", by=100):
             box.value = Sized(2, sub=100)
+
+    def test_matchers_count_items_too(self):
+        tags = {"a"}
+        with changes(lambda: tags, by=pytest.approx(1)):
+            tags.add("b")
+
+    def test_list_subclasses_count(self):
+        class Items(list):
+            pass
+
+        items = Items(["a"])
+        with changes(lambda: items, by=1):
+            items.append("b")
+
+    def test_dicts_and_tuples_count(self):
+        box = Counter({"a": 1})
+        with changes(box, "value", by=1):
+            box.value = {"a": 1, "b": 2}
+        box = Counter(("a",))
+        with changes(box, "value", by=2):
+            box.value = ("a", "b", "c")
 
     def test_any_other_by_subtracts(self):
         stock = Counter(collections.Counter(apple=1))
@@ -392,12 +413,12 @@ class TestInspect:
             books.append("b")
         assert c.delta == 1
 
-    def test_delta_subtracts_values_that_do(self):
+    def test_delta_counts_collections_and_subtracts_the_rest(self):
         tags, pos = Counter({"a"}), Counter(Vec(0, 0))
         with changes(tags, "value") as t, changes(pos, "value") as p:
             tags.value = {"a", "b"}
             pos.value = Vec(3, 4)
-        assert (t.delta, p.delta) == ({"b"}, Vec(3, 4))
+        assert (t.delta, p.delta) == (1, Vec(3, 4))
 
     def test_delta_of_values_neither_sized_nor_subtractable_raises(self):
         shelf = Counter(None)
@@ -490,24 +511,6 @@ class TestReentry:
         with context:
             pass
         assert (context.before, context.after) == (1, 1)
-
-    def test_a_clean_reuse_clears_an_earlier_skip(self, pytester):
-        pytester.makepyfile(
-            """
-            import pytest
-            from pytest_changes import unchanged
-
-            def test_it():
-                box = [1]
-                context = unchanged(lambda: box)
-                with pytest.raises(ValueError), context:
-                    raise ValueError
-                with context:
-                    pass
-            """
-        )
-        result = pytester.runpytest_subprocess("-W", "error::pytest_changes.ChangeWarning")
-        result.assert_outcomes(passed=1)
 
 
 class TestInvalidCombos:

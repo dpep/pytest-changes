@@ -74,3 +74,31 @@ class TestBlockRaises:
                     raise stop
                 stop()
         assert not isinstance(e.value, Warning)
+
+
+@pytest.mark.filterwarnings("ignore::pytest_changes.ChangeWarning")
+def test_reuse_remembers_an_unchecked_block(pytester):
+    pytester.makepyfile(
+        """
+        import pytest
+        from pytest_changes import unchanged
+
+
+        class Account:
+            balance = 100
+
+
+        def test_it():
+            account = Account()
+            context = unchanged(account, "balance")
+            with pytest.raises(ValueError), context:
+                account.balance = -400
+                raise ValueError
+            account.balance = 100
+            with context:
+                pass
+        """
+    )
+    result = pytester.runpytest_subprocess("-W", "error::pytest_changes.ChangeWarning")
+    result.assert_outcomes(failed=1)
+    result.stdout.fnmatch_lines(["*wasn't checked because the block raised ValueError*"])

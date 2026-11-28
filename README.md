@@ -47,7 +47,7 @@ changes(user, "status", to="active")
 changes(cart, "total", by=20)
 ```
 
-With a number or a range, `by` counts items for values with a length (characters, for a string); any other `by`, such as a `Counter` or a vector, is compared with `after - before`:
+For lists, tuples, sets, dicts and strings, Δ counts items (characters, for a string); everything else, including types with their own `-` such as a `Counter` or a vector, is compared with `after - before`:
 ```python
 with changes(lambda: cart.items, by=1):
     cart.add(item)
@@ -67,7 +67,7 @@ with changes(lambda: queue, by=range(1, 4)):
 E       pytest_changes.ChangeAssertionError: queue: expected Δ in 1..3, got Δ +4 (len 0 → 4)
 ```
 
-With `as c`, `c.before` and `c.after` hold the values read on entering and leaving the block. `c.delta` is `after - before`, or `len(after) - len(before)` for values that don't subtract, such as lists and strings, and raises `TypeError` when neither works.
+With `as c`, `c.before` and `c.after` hold the values read on entering and leaving the block. `c.delta` follows the same rule as `by`: items added for built-in collections, else `after - before`. It raises `TypeError` when neither works.
 
 #### Unchanged
 Assert that nothing changed:
@@ -132,7 +132,7 @@ changes(lambda: id(account))  # if identity really is what you mean
 
 The same goes for ORM models whose `==` compares primary keys: read the field, as in `changes(lambda: User.objects.get(pk=1).status)`. Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`: return a comparable value, as in `changes(lambda: a.tolist())`.
 
-When a test returns, each `changes()` or `unchanged()` made during it (fixtures and `setUp` included) that didn't run its check, because it was never entered or because the block raised, emits a `ChangeWarning` at the line that made it. A test that fails stays quiet, so the warning never hides the real failure. A context can be reused, one `with` block at a time: each block checks afresh, and entering one that is already in a block raises `RuntimeError`. Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
+When a test returns, each `changes()` or `unchanged()` made during it (fixtures and `setUp` included) that didn't run its check, because it was never entered or because the block raised, emits a `ChangeWarning` at the line that made it. A test that fails stays quiet, so the warning never hides the real failure. A context can be reused, one `with` block at a time, and entering one that is already in a block raises `RuntimeError`; a block that wasn't checked is still reported, even if a later block passes. Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
 
 For async code, use a plain `with` around the `await`:
 ```python

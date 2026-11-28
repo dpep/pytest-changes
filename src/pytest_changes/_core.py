@@ -115,24 +115,22 @@ class ChangeContext:
 
     @property
     def delta(self) -> Any:
-        """`after - before`, or `len(after) - len(before)` for values that don't subtract."""
-        return self._delta("delta", count=False)[0]
+        """How many items were added for built-in collections, else `after - before`."""
+        return self._delta("delta")[0]
 
-    def _delta(self, needed_by: str, count: bool) -> tuple[Any, bool]:
-        """The delta, and whether it counts items; `count` tries lengths before subtracting."""
+    def _delta(self, needed_by: str) -> tuple[Any, bool]:
+        """The delta, and whether it counts items."""
         __tracebackhide__ = True
         after, before = self.after, self.before
-        try:
-            lengths = len(after) - len(before)
-        except TypeError:
-            lengths = None
-        if count and lengths is not None:
-            return lengths, True
+        if _counts_items(after) and _counts_items(before):
+            return len(after) - len(before), True
         try:
             return after - before, False
         except TypeError:
-            if lengths is not None:
-                return lengths, True
+            try:
+                return len(after) - len(before), True
+            except TypeError:
+                pass
             raise TypeError(
                 f"{self.label}: {needed_by} needs values with a length or that subtract "
                 f"({type(after).__name__} - {type(before).__name__} failed)"
@@ -147,7 +145,6 @@ class ChangeContext:
             )
         # each block is checked afresh, so a context can be reused one block at a time
         self._entered = True
-        self._skipped_by = None
         self._before = self._after = MISSING
         self._after_unset = "it's read when the with block exits"
         # after is read and compared at once, so only before needs protecting from the block
@@ -251,7 +248,7 @@ class ChangeContext:
         __tracebackhide__ = True
         by = self._by
         # by=1 on a set means one more item, not a set difference
-        delta, counts = self._delta("by=", count=isinstance(by, numbers.Number | range))
+        delta, counts = self._delta("by=")
         if isinstance(by, range) and not isinstance(delta, numbers.Integral):
             # an interval check would read as a contradiction: "Δ in 1..2, got Δ +1.5"
             raise TypeError(
@@ -333,3 +330,14 @@ def _explained(headline: str, explanation: list[str]) -> str:
 def _indent(text: str, prefix: str) -> str:
     # continuation lines sit under their own headline, so stacked failures stay apart
     return text.replace("\n", "\n" + prefix)
+
+
+_COLLECTIONS = (list, tuple, set, frozenset, dict, str, bytes)
+
+
+def _counts_items(value: Any) -> bool:
+    # a type that defines its own `-` (Counter, a vector) means it, so subtraction wins
+    for base in _COLLECTIONS:
+        if isinstance(value, base):
+            return getattr(type(value), "__sub__", None) is getattr(base, "__sub__", None)
+    return False
