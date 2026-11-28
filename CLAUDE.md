@@ -2,6 +2,7 @@
 
 Assert value changes: `changes` / `unchanged` context managers.
 Design brief: [Build brief: Python change-block assertions](https://claude.ai/artifact/D41uJUE6VB6CxKTnz2ZBLE)
+[DECISIONS.md](DECISIONS.md) records what was considered and turned down; read it before proposing a new keyword or rule, and add an entry when you reject a tempting path.
 
 ## Gate
 `script/check.sh` runs pytest, `ruff check` and `ruff format --check`. Run it before every commit.
