@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import functools
 import numbers
+import sys
+import warnings
 from collections.abc import Callable
 from types import TracebackType
 from typing import Any, Self
@@ -16,6 +18,10 @@ class _Missing:
 
 
 MISSING: Any = _Missing()
+
+
+class ChangeWarning(RuntimeWarning):
+    """A change expectation that can't assert what it appears to."""
 
 
 class ChangeAssertionError(AssertionError):
@@ -66,6 +72,22 @@ class ChangeContext:
         self._by = by
         self._before: Any = MISSING
         self._after: Any = MISSING
+        self._site = _caller_site()
+        self._entered = False
+
+    def __del__(self) -> None:
+        # like an un-awaited coroutine: without `with`, nothing is ever checked
+        if getattr(self, "_entered", True):
+            return
+        name = "changes" if self._expect_change else "unchanged"
+        filename, lineno, module = self._site
+        warnings.warn_explicit(
+            f"{name}() was never entered, so it asserts nothing: use it in a with statement",
+            ChangeWarning,
+            filename,
+            lineno,
+            module,
+        )
 
     @functools.cached_property
     def label(self) -> str:
@@ -99,6 +121,7 @@ class ChangeContext:
 
     def __enter__(self) -> Self:
         __tracebackhide__ = True
+        self._entered = True
         # after is read and compared at once, so only before needs protecting from the block
         value = self._read("before the block")
         try:
@@ -227,6 +250,13 @@ def unchanged(
 ) -> ChangeContext:
     """Assert that the block leaves `getter()` (or `getattr(getter, attr)`) equal to before."""
     return ChangeContext(getter, attr, expect_change=False, label=label)
+
+
+def _caller_site() -> tuple[str, int, str]:
+    frame = sys._getframe(1)
+    while frame.f_back is not None and _label._in_package(frame.f_globals.get("__name__")):
+        frame = frame.f_back
+    return frame.f_code.co_filename, frame.f_lineno, frame.f_globals.get("__name__", "")
 
 
 def _resolve_getter(getter: Any, attr: str | None) -> Callable[[], Any]:

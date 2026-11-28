@@ -7,6 +7,9 @@ import pytest
 
 from pytest_changes import ChangeAssertionError, _label, changes, unchanged
 
+# these tests build contexts without entering them, just to read their labels
+pytestmark = pytest.mark.filterwarnings("ignore::pytest_changes.ChangeWarning")
+
 
 class Cart:
     def __init__(self):
@@ -31,7 +34,7 @@ def cart_total():
 
 def watching(getter):
     def wrap(fn):
-        fn.context = changes(getter)
+        fn.getter = getter
         return fn
 
     return wrap
@@ -124,7 +127,7 @@ class TestLambda:
         )
 
     def test_in_a_decorator(self):
-        assert decorated.context.label == "CART.total + 1"
+        assert changes(decorated.getter).label == "CART.total + 1"
 
     def test_as_a_default_argument(self):
         assert with_default().label == "len(CART.items)"
@@ -152,7 +155,9 @@ class TestFallback:
         exec(code, namespace)  # noqa: S102
         assert namespace["a"].label == "<lambda at <string>:1>"
         assert namespace["b"].label == "<Cart>.total"
-        assert namespace["c"].label == "<count at test_label.py:16>"
+        assert namespace["c"].label == "<count at test_label.py:19>"
+        # the lambda's globals are this dict; break the cycle so its contexts die in this test
+        namespace.clear()
 
     def test_call_shape_mismatch(self):
         # partial makes the call site a different call
