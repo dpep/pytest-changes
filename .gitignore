@@ -11,3 +11,4 @@ sdist
 .venv
 .claude/worktrees
 .ruff_cache
+research
