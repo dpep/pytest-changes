@@ -1,6 +1,6 @@
 import pytest
 
-from pytest_changes import ChangeAssertionError, changes
+from pytest_changes import ChangeAssertionError, changes, unchanged
 
 
 class Counter:
@@ -160,3 +160,10 @@ class TestInvalidCombos:
     def test_to_and_by(self, counter):
         with pytest.raises(TypeError, match="cannot combine to and by"):
             changes(counter, "value", to=1, by=1)
+
+
+class TestSignature:
+    @pytest.mark.parametrize("make", [changes, unchanged])
+    def test_getter_and_attr_are_positional_only(self, counter, make):
+        with pytest.raises(TypeError, match="positional"):
+            make(getter=counter, attr="value")

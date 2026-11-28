@@ -160,6 +160,7 @@ class ChangeContext:
 def changes(
     getter: Any,
     attr: str | None = None,
+    /,
     *,
     to: Any = MISSING,
     by: Any = MISSING,
@@ -169,7 +170,9 @@ def changes(
     return ChangeContext(getter, attr, expect_change=True, to=to, by=by, label=label)
 
 
-def unchanged(getter: Any, attr: str | None = None, *, label: str | None = None) -> ChangeContext:
+def unchanged(
+    getter: Any, attr: str | None = None, /, *, label: str | None = None
+) -> ChangeContext:
     """Assert that the block leaves `getter()` (or `getattr(getter, attr)`) equal to before."""
     return ChangeContext(getter, attr, expect_change=False, label=label)
 
