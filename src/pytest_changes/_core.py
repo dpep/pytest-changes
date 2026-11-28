@@ -30,8 +30,6 @@ class ChangeAssertionError(AssertionError):
     def __init__(self, label: str, detail: str):
         super().__init__()
         self.failures: list[tuple[str, str]] = [(label, detail)]
-        # the exception the block raised, if any; outer stacked contexts chain from it too
-        self._block_error: BaseException | None = None
 
     def __str__(self) -> str:
         if len(self.failures) == 1:
@@ -150,34 +148,37 @@ class ChangeContext:
         tb: TracebackType | None,
     ) -> None:
         __tracebackhide__ = True
-        if isinstance(exc, ChangeAssertionError):
-            block_error = exc._block_error
-        elif exc is None or isinstance(exc, Exception):
-            block_error = exc
-        else:
-            return  # KeyboardInterrupt, pytest.skip and the like: the test is over
+        # an inner context's failure isn't the block raising: check, and merge into it
+        if exc is not None and not isinstance(exc, ChangeAssertionError):
+            # what pytest.raises is used for; pytest outcomes and KeyboardInterrupt end the test
+            if isinstance(exc, Exception | SystemExit):
+                name = "changes" if self._expect_change else "unchanged"
+                error = type(exc).__name__
+                warnings.warn(
+                    f"{self.label}: not checked because the block raised {error}: put the "
+                    f"expectation outside pytest.raises: with {name}(...), pytest.raises({error}):",
+                    ChangeWarning,
+                    stacklevel=2,
+                )
+            return
 
-        self._after = self._read(
-            "after the block raised" if block_error else "after the block completed"
-        )
+        self._after = self._read("after the block")
         try:
             detail = self._check()
             hint = self._identity_hint()
         except Incomparable:
-            raise self._incomparable(self._after) from block_error
+            raise self._incomparable(self._after) from None
         if detail is None:
             if hint is not None:
                 warnings.warn(f"{self.label}: {hint}", ChangeWarning, stacklevel=2)
             return
         if hint is not None:
             detail += "\n" + hint
-        if isinstance(exc, ChangeAssertionError):
+        if exc is not None:
             # inner contexts exit first, so prepending keeps source order
             exc.failures.insert(0, (self.label, detail))
             return
-        error = ChangeAssertionError(self.label, detail)
-        error._block_error = block_error
-        raise error from block_error
+        raise ChangeAssertionError(self.label, detail)
 
     def _identity_hint(self) -> str | None:
         """Why a before/after comparison may be judging identity rather than state."""

@@ -1,6 +1,8 @@
+import warnings
+
 import pytest
 
-from pytest_changes import ChangeAssertionError, unchanged
+from pytest_changes import ChangeAssertionError, ChangeWarning, unchanged
 
 
 class Counter:
@@ -25,41 +27,78 @@ class InsufficientFunds(Exception):
     pass
 
 
-def withdraw_buggy(acct, amount):
+def withdraw_buggy(acct, amount, error=None):
     acct.value -= amount
-    raise InsufficientFunds
+    raise error or InsufficientFunds()
+
+
+def warning(label, error, make="unchanged"):
+    return (
+        f"{label}: not checked because the block raised {error}: put the expectation "
+        f"outside pytest.raises: with {make}(...), pytest.raises({error}):"
+    )
 
 
 class TestBlockRaises:
-    def test_change_fails_chained_from_the_block_error(self):
-        acct = Counter(50)
-        with (
-            pytest.raises(ChangeAssertionError) as e,
-            pytest.raises(InsufficientFunds),
-            unchanged(acct, "value"),
-        ):
-            withdraw_buggy(acct, 100)
-        assert str(e.value) == "acct.value: expected no change, got 50 → -50"
-        assert isinstance(e.value.__cause__, InsufficientFunds)
-
-    def test_no_change_lets_the_error_through_untouched(self):
+    def test_skips_the_check_and_warns(self):
         acct = Counter(50)
         error = InsufficientFunds()
-        with pytest.raises(InsufficientFunds) as e, unchanged(acct, "value"):
-            raise error
+        with (
+            pytest.warns(ChangeWarning) as record,
+            pytest.raises(InsufficientFunds) as e,
+            unchanged(acct, "value"),
+        ):
+            withdraw_buggy(acct, 100, error)
         assert e.value is error
         assert e.value.__context__ is None
+        assert [str(w.message) for w in record] == [warning("acct.value", "InsufficientFunds")]
+        assert record[0].filename == __file__
 
-    def test_control_flow_exceptions_skip_the_check(self):
+    def test_expectation_outside_pytest_raises_catches_mutate_then_raise(self):
         acct = Counter(50)
-        with pytest.raises(pytest.skip.Exception), unchanged(acct, "value"):
-            acct.value = 0
-            pytest.skip("not today")
+        with pytest.raises(ChangeAssertionError) as e:  # noqa: SIM117
+            with unchanged(acct, "value"), pytest.raises(InsufficientFunds):
+                withdraw_buggy(acct, 100)
+        assert str(e.value) == "acct.value: expected no change, got 50 → -50"
 
-    def test_getter_error_after_the_block_raised(self):
-        state = {"ok": True}
-        with pytest.raises(KeyError) as e, unchanged(lambda: state["ok"], label="state"):
-            del state["ok"]
-            raise InsufficientFunds
-        assert "after the block raised" in e.value.__notes__[0]
-        assert isinstance(e.value.__context__, InsufficientFunds)
+    def test_system_exit_warns(self):
+        acct = Counter(50)
+        with pytest.warns(ChangeWarning) as record, pytest.raises(SystemExit):  # noqa: SIM117
+            with unchanged(acct, "value"):
+                raise SystemExit(2)
+        assert [str(w.message) for w in record] == [warning("acct.value", "SystemExit")]
+
+    @pytest.mark.parametrize(
+        "stop", [lambda: pytest.skip("not today"), lambda: pytest.fail("no"), KeyboardInterrupt]
+    )
+    def test_test_outcomes_and_interrupts_are_silent(self, stop):
+        acct = Counter(50)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            with pytest.raises(BaseException) as e, unchanged(acct, "value"):
+                acct.value = 0
+                if isinstance(stop, type):
+                    raise stop
+                stop()
+        assert not isinstance(e.value, Exception | SystemExit)
+
+    def test_warning_as_error_keeps_the_block_error_visible(self, pytester):
+        pytester.makepyfile(
+            """
+            from pytest_changes import unchanged
+
+            def test_it():
+                box = [1]
+                with unchanged(lambda: box):
+                    raise ValueError("the real problem")
+            """
+        )
+        result = pytester.runpytest_subprocess("-W", "error::pytest_changes.ChangeWarning")
+        result.assert_outcomes(failed=1)
+        result.stdout.fnmatch_lines(
+            [
+                "*ValueError: the real problem",
+                "*During handling of the above exception, another exception occurred*",
+                "E *ChangeWarning: box: not checked because the block raised ValueError*",
+            ]
+        )
