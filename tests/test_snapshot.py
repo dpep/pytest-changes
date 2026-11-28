@@ -1,5 +1,6 @@
 import enum
 import threading
+import types
 import warnings
 
 import pytest
@@ -226,3 +227,24 @@ class TestComparisonWithoutTruth:
         with pytest.raises(TypeError) as e, changes(lambda: a, label="a"):
             a.values[0] = 1
         assert str(e.value) == AMBIGUOUS.replace("Array", "Uncopyable")
+
+
+class TestLiveViews:
+    @pytest.mark.parametrize(
+        ("getter", "kind"),
+        [
+            (lambda d: d.keys(), "dict_keys"),
+            (lambda d: d.values(), "dict_values"),
+            (lambda d: d.items(), "dict_items"),
+            (lambda d: types.MappingProxyType(d), "mappingproxy"),
+        ],
+        ids=["keys", "values", "items", "mappingproxy"],
+    )
+    def test_refused_on_entry(self, getter, kind):
+        d = {"a": 1}
+        with pytest.raises(TypeError) as e, unchanged(lambda: getter(d), label="d"):
+            d["b"] = 2
+        assert str(e.value) == (
+            f"d: {kind} is a live view, so it can't be compared before and after: "
+            "return a copy from the getter, such as list(...) or dict(...)"
+        )

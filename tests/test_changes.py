@@ -108,7 +108,8 @@ class TestBy:
         with pytest.raises(TypeError) as e, changes(user, "value", by=1):
             user.value = object()
         assert str(e.value) == (
-            "user.value: by= needs values with a length or that subtract (object - object failed)"
+            "user.value: by= needs collections or values that subtract (object - object failed): "
+            "return a number or a length from the getter"
         )
         assert e.value.__suppress_context__
 
@@ -191,10 +192,20 @@ class TestByLength:
         with changes(lambda: tags, by=1):
             tags.add("b")
 
-    def test_strings_count_characters(self):
-        log = Counter("ab")
-        with changes(log, "value", by=3):
-            log.value += "cde"
+    def test_strings_refuse(self):
+        # "9" -> "14" would pass by=1 if strings counted characters
+        hits = Counter("9")
+        with pytest.raises(TypeError) as e, changes(hits, "value", by=1):
+            hits.value = "14"
+        assert message(e) == (
+            "hits.value: by= needs collections or values that subtract (str - str failed): "
+            "return a number or a length from the getter"
+        )
+
+    def test_sized_values_without_subtraction_refuse(self):
+        queue = Counter(collections.deque("a"))
+        with pytest.raises(TypeError), changes(queue, "value", by=1):
+            queue.value = collections.deque("ab")
 
     def test_own_subtraction_wins_over_length(self):
         box = Counter(Sized(1))
@@ -427,7 +438,8 @@ class TestInspect:
         with pytest.raises(TypeError) as e:
             c.delta  # noqa: B018
         assert str(e.value) == (
-            "shelf.value: delta needs values with a length or that subtract (int - NoneType failed)"
+            "shelf.value: delta needs collections or values that subtract (int - NoneType failed): "
+            "return a number or a length from the getter"
         )
 
     def test_values_are_unset_until_read(self, counter):

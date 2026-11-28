@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import numbers
+import types
 import warnings
 from collections.abc import Callable
 from types import TracebackType
@@ -115,7 +116,7 @@ class ChangeContext:
 
     @property
     def delta(self) -> Any:
-        """How many items were added for built-in collections, else `after - before`."""
+        """How many items were added for lists, tuples, sets and dicts, else `after - before`."""
         return self._delta("delta")[0]
 
     def _delta(self, needed_by: str) -> tuple[Any, bool]:
@@ -127,13 +128,10 @@ class ChangeContext:
         try:
             return after - before, False
         except TypeError:
-            try:
-                return len(after) - len(before), True
-            except TypeError:
-                pass
             raise TypeError(
-                f"{self.label}: {needed_by} needs values with a length or that subtract "
-                f"({type(after).__name__} - {type(before).__name__} failed)"
+                f"{self.label}: {needed_by} needs collections or values that subtract "
+                f"({type(after).__name__} - {type(before).__name__} failed): "
+                "return a number or a length from the getter"
             ) from None
 
     def __enter__(self) -> Self:
@@ -149,6 +147,11 @@ class ChangeContext:
         self._after_unset = "it's read when the with block exits"
         # after is read and compared at once, so only before needs protecting from the block
         value = self._read("before the block")
+        if isinstance(value, _LIVE_VIEWS):
+            raise TypeError(
+                f"{self.label}: {type(value).__name__} is a live view, so it can't be compared "
+                "before and after: return a copy from the getter, such as list(...) or dict(...)"
+            )
         try:
             self._before, self._complete = snapshot(value)
         except Incomparable:
@@ -332,7 +335,11 @@ def _indent(text: str, prefix: str) -> str:
     return text.replace("\n", "\n" + prefix)
 
 
-_COLLECTIONS = (list, tuple, set, frozenset, dict, str, bytes)
+# they can't be copied, so before would be the live object after the block
+_LIVE_VIEWS = (type({}.keys()), type({}.values()), type({}.items()), types.MappingProxyType)
+
+# not str: "9" -> "14" would pass by=1 if characters counted
+_COLLECTIONS = (list, tuple, set, frozenset, dict)
 
 
 def _counts_items(value: Any) -> bool:

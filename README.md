@@ -49,9 +49,6 @@ with unchanged(audit, "count"):
     audit.read()
 ```
 
-A context can be reused, one `with` block at a time. Entering one that is already in a block raises `RuntimeError`.
-
-
 ## `to` and `by`
 Constrain the change with `to` (the end value, which must differ from the start) or `by` (the difference). They can't be combined:
 ```python
@@ -60,7 +57,7 @@ changes(cart, "total", by=20)
 ```
 
 ### Collections
-For lists, tuples, sets, dicts and strings, Δ counts items (characters, for a string); everything else, including types with their own `-` such as a `Counter` or a vector, is compared with `after - before`:
+For lists, tuples, sets and dicts, Δ counts items; everything else, including types with their own `-` such as a `Counter` or a vector, is compared with `after - before`. A string raises `TypeError` rather than counting characters, so a counter stored as `"9"` can't pass `by=1` by luck: return `int(...)` or `len(...)` from the getter.
 ```python
 with changes(lambda: cart.items, by=1):
     cart.add(item)
@@ -82,7 +79,7 @@ with changes(lambda: queue, by=range(1, 4)):
 E       pytest_changes.ChangeAssertionError: queue: expected Δ in 1..3, got Δ +4 (len 0 → 4)
 ```
 
-The delta must be an integer. A float or `Decimal` delta raises `TypeError`, so assert on `c.delta` instead (see [Before, after and delta](#before-after-and-delta)).
+The delta must be an integer. A float or `Decimal` delta raises `TypeError`, so assert on `c.delta` instead (see [Before, after and delta](#before-after-and-delta)). The same goes for an open bound: `assert c.delta >= 1`.
 
 
 ## Before, after and delta
@@ -93,7 +90,7 @@ with changes(cart, "total") as c:
 assert c.delta == 15
 ```
 
-`c.delta` follows the same rule as `by`: items added for built-in collections, else `after - before`. It raises `TypeError` when neither works.
+`c.delta` follows the same rule as `by`: items added for lists, tuples, sets and dicts, else `after - before`. It raises `TypeError` when the values don't subtract.
 
 
 ## Stacking
@@ -167,6 +164,8 @@ A `ChangeWarning` flags two things:
 A test that fails stays quiet, so the warning never hides the real failure.
 
 Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
+
+A context can be reused, one `with` block at a time. Entering one that is already in a block raises `RuntimeError`.
 
 
 ## Async
