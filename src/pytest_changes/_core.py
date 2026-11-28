@@ -47,25 +47,10 @@ class ChangeContext:
         expect_change: bool,
         to: Any = MISSING,
         by: Any = MISSING,
-        by_at_least: Any = MISSING,
-        by_at_most: Any = MISSING,
         label: str | None = None,
     ):
-        given = {
-            name
-            for name, value in [
-                ("to", to),
-                ("by", by),
-                ("by_at_least", by_at_least),
-                ("by_at_most", by_at_most),
-            ]
-            if value is not MISSING
-        }
-        for conflict in [{"to", "by"}, {"to", "by_at_least"}, {"to", "by_at_most"}]:
-            if conflict <= given:
-                raise TypeError(f"changes() cannot combine {' and '.join(sorted(conflict))}")
-        if "by" in given and given & {"by_at_least", "by_at_most"}:
-            raise TypeError("changes() cannot combine by with by_at_least or by_at_most")
+        if to is not MISSING and by is not MISSING:
+            raise TypeError("changes() cannot combine to and by")
 
         self._get = _resolve_getter(getter, attr)
         if label is not None:
@@ -75,8 +60,6 @@ class ChangeContext:
         self._expect_change = expect_change
         self._to = to
         self._by = by
-        self._by_at_least = by_at_least
-        self._by_at_most = by_at_most
         self.before: Any = MISSING
         self.after: Any = MISSING
 
@@ -136,11 +119,7 @@ class ChangeContext:
             r, explanation = _plugin.compare(after, before)
             return _explained(f"expected no change, got {self._transition(r)}", explanation)
 
-        if (
-            self._by is not MISSING
-            or self._by_at_least is not MISSING
-            or self._by_at_most is not MISSING
-        ):
+        if self._by is not MISSING:
             return self._check_delta()
 
         if self._to is not MISSING:
@@ -160,21 +139,9 @@ class ChangeContext:
                 f"{type(self.before).__name__} and {type(self.after).__name__}"
             ) from e
 
-        if self._by is not MISSING:
-            ok = self._by == delta
-            expected = f"Δ {_signed(self._by)}"
-        else:
-            least, most = self._by_at_least, self._by_at_most
-            ok = (least is MISSING or delta >= least) and (most is MISSING or delta <= most)
-            if least is not MISSING and most is not MISSING:
-                expected = f"{_signed(least)} ≤ Δ ≤ {_signed(most)}"
-            elif least is not MISSING:
-                expected = f"Δ ≥ {_signed(least)}"
-            else:
-                expected = f"Δ ≤ {_signed(most)}"
-
-        if ok:
+        if self._by == delta:
             return None
+        expected = f"Δ {_signed(self._by)}"
         if self.before != self.after:
             return f"expected {expected}, got Δ {_signed(delta)} ({self.before!r} → {self.after!r})"
         return f"expected {expected}, did not change (stayed {self.before!r})"
@@ -196,21 +163,10 @@ def changes(
     *,
     to: Any = MISSING,
     by: Any = MISSING,
-    by_at_least: Any = MISSING,
-    by_at_most: Any = MISSING,
     label: str | None = None,
 ) -> ChangeContext:
     """Assert that the block changes `getter()`, or `getattr(getter, attr)` when attr is given."""
-    return ChangeContext(
-        getter,
-        attr,
-        expect_change=True,
-        to=to,
-        by=by,
-        by_at_least=by_at_least,
-        by_at_most=by_at_most,
-        label=label,
-    )
+    return ChangeContext(getter, attr, expect_change=True, to=to, by=by, label=label)
 
 
 def unchanged(getter: Any, attr: str | None = None, *, label: str | None = None) -> ChangeContext:

@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- `changes` and `unchanged` context managers with `to`, `by`, `by_at_least` and `by_at_most` constraints.
+- `changes` and `unchanged` context managers with `to` and `by` constraints. To bound a change, check the delta afterwards: `assert c.delta >= 1`.
 - Stacked contexts in one `with` report every failed expectation in a single error.
 - Requires pytest 8.4+.
 - The value is snapshotted before the block, so a list or dict mutated in place counts as a change. Objects without `__eq__` still compare by identity: pass a getter such as `lambda: vars(user)` to compare their state.

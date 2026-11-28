@@ -69,22 +69,6 @@ class TestBy:
         with changes(counter, "value", by=0):
             pass
 
-    def test_at_least(self):
-        queue = Counter(3)
-        with pytest.raises(ChangeAssertionError) as e, changes(queue, "value", by_at_least=1):
-            pass
-        assert message(e) == "queue.value: expected Δ ≥ +1, did not change (stayed 3)"
-
-    def test_at_most(self):
-        queue = Counter(2)
-        with pytest.raises(ChangeAssertionError) as e, changes(queue, "value", by_at_most=3):
-            queue.value = 7
-        assert message(e) == "queue.value: expected Δ ≤ +3, got Δ +5 (2 → 7)"
-
-    def test_range(self, counter):
-        with changes(counter, "value", by_at_least=1, by_at_most=3):
-            counter.value += 2
-
     def test_values_that_cannot_subtract(self):
         user = Counter("a")
         with (
@@ -173,16 +157,6 @@ class TestBlockErrors:
 
 
 class TestInvalidCombos:
-    @pytest.mark.parametrize(
-        "kwargs",
-        [
-            {"to": 1, "by": 1},
-            {"to": 1, "by_at_least": 1},
-            {"to": 1, "by_at_most": 1},
-            {"by": 1, "by_at_least": 1},
-            {"by": 1, "by_at_most": 1},
-        ],
-    )
-    def test_raise_at_construction(self, counter, kwargs):
-        with pytest.raises(TypeError):
-            changes(counter, "value", **kwargs)
+    def test_to_and_by(self, counter):
+        with pytest.raises(TypeError, match="cannot combine to and by"):
+            changes(counter, "value", to=1, by=1)
