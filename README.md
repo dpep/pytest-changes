@@ -20,7 +20,7 @@ assert cart.total - before == 20
 ```
 
 
-### Install
+## Install
 ```
 pip install pytest-changes
 ```
@@ -28,7 +28,7 @@ pip install pytest-changes
 Requires Python 3.11+ and pytest 8.4+.
 
 
-### Usage
+## Usage
 Pass a zero-argument getter. With no constraint, the value just has to change:
 ```python
 with changes(lambda: cart.status):
@@ -41,24 +41,39 @@ with changes(cart, "total", by=20):
     cart.add(item)
 ```
 
+To assert that nothing changed, use `unchanged`:
+```python
+from pytest_changes import unchanged
+
+with unchanged(audit, "count"):
+    audit.read()
+```
+
+A context can be reused, one `with` block at a time. Entering one that is already in a block raises `RuntimeError`.
+
+
+## `to` and `by`
 Constrain the change with `to` (the end value, which must differ from the start) or `by` (the difference). They can't be combined:
 ```python
 changes(user, "status", to="active")
 changes(cart, "total", by=20)
 ```
 
+### Collections
 For lists, tuples, sets, dicts and strings, Δ counts items (characters, for a string); everything else, including types with their own `-` such as a `Counter` or a vector, is compared with `after - before`:
 ```python
 with changes(lambda: cart.items, by=1):
     cart.add(item)
 ```
 
+### Matchers
 Values compare with `==`, expected value first, so matchers such as `pytest.approx` or dirty-equals work as `by` and `to`:
 ```python
 changes(account, "balance", by=pytest.approx(0.1))
 ```
 
-For a range, pass one. Like `in`, the stop is excluded, so this passes for 1, 2 or 3 new jobs. The delta must be an integer; a float or `Decimal` delta raises `TypeError`, so assert on `c.delta` instead:
+### Ranges
+For a range, pass one. Like `in`, the stop is excluded, so this passes for 1, 2 or 3 new jobs:
 ```python
 with changes(lambda: queue, by=range(1, 4)):
     queue.push_many(jobs)
@@ -67,33 +82,21 @@ with changes(lambda: queue, by=range(1, 4)):
 E       pytest_changes.ChangeAssertionError: queue: expected Δ in 1..3, got Δ +4 (len 0 → 4)
 ```
 
-With `as c`, `c.before` and `c.after` hold the values read on entering and leaving the block. `c.delta` follows the same rule as `by`: items added for built-in collections, else `after - before`. It raises `TypeError` when neither works.
+The delta must be an integer. A float or `Decimal` delta raises `TypeError`, so assert on `c.delta` instead (see [Before, after and delta](#before-after-and-delta)).
 
-#### Unchanged
-Assert that nothing changed:
+
+## Before, after and delta
+With `as c`, `c.before` and `c.after` hold the values read on entering and leaving the block:
 ```python
-from pytest_changes import unchanged
-
-with unchanged(audit, "count"):
-    audit.read()
+with changes(cart, "total") as c:
+    cart.add(item)
+assert c.delta == 15
 ```
 
-#### Error paths
-If the block raises, the check is skipped and the exception propagates untouched. To check what a failed operation leaves behind, put the expectation outside `pytest.raises`:
-```python
-with unchanged(lambda: account.balance), pytest.raises(ValueError):
-    account.withdraw(500)
+`c.delta` follows the same rule as `by`: items added for built-in collections, else `after - before`. It raises `TypeError` when neither works.
 
-with changes(lambda: len(log), by=1), pytest.raises(ValueError):
-    account.withdraw(500)
-```
-```
-E       pytest_changes.ChangeAssertionError: account.balance: expected no change, got 100 → -400
-```
 
-With `pytest.raises` on the outside instead, the expectation is never checked, and a `ChangeWarning` says so when the test returns.
-
-#### Stacking
+## Stacking
 Stack expectations in one `with`, and every failure is reported:
 ```python
 with (
@@ -109,6 +112,8 @@ E         ✗ cart.total   expected Δ +20, got Δ +15 (0 → 15)
 E         ✗ audit.count  expected no change, got 4 → 5
 ```
 
+
+## Failure messages
 Failures name the expression as you wrote it. Pass `label=` to name it yourself:
 ```python
 changes(lambda: cart.total, by=20, label="cart total")
@@ -116,25 +121,56 @@ changes(lambda: cart.total, by=20, label="cart total")
 
 Values too long to read on one line get pytest's own diff, as if you'd written `assert after == expected`, and `-v`/`-vv` show more.
 
-#### Snapshots
+
+## When the block raises
+If the block raises, the check is skipped and the exception propagates untouched. To check what a failed operation leaves behind, put the expectation outside `pytest.raises`:
+```python
+with unchanged(lambda: account.balance), pytest.raises(ValueError):
+    account.withdraw(500)
+
+with changes(lambda: len(log), by=1), pytest.raises(ValueError):
+    account.withdraw(500)
+```
+```
+E       pytest_changes.ChangeAssertionError: account.balance: expected no change, got 100 → -400
+```
+
+With `pytest.raises` on the outside instead, the expectation is never checked, and a [`ChangeWarning`](#warnings) says so when the test returns.
+
+
+## What counts as a change
 The value is copied before the block, so mutating it in place counts as a change:
 ```python
 with changes(cart, "items"):
     cart.items.append(item)
 ```
 
-Objects without `__eq__` compare by identity, so changing their attributes isn't a change. A `ChangeWarning` flags values like these that can't be fully copied, along with values holding something uncopyable, such as a lock. Write a getter for the state you mean:
+Objects without `__eq__` compare by identity, so changing their attributes isn't a change, and a [`ChangeWarning`](#warnings) flags them. Write a getter for the state you mean:
 ```python
 changes(lambda: vars(account))
 changes(lambda: account.balance)
 changes(lambda: id(account))  # if identity really is what you mean
 ```
 
-The same goes for ORM models whose `==` compares primary keys: read the field, as in `changes(lambda: User.objects.get(pk=1).status)`. Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`: return a comparable value, as in `changes(lambda: a.tolist())`.
+### ORM models and numpy arrays
+The same goes for ORM models whose `==` compares primary keys: read the field, as in `changes(lambda: User.objects.get(pk=1).status)`.
 
-When a test returns, each `changes()` or `unchanged()` made during it (fixtures and `setUp` included) that didn't run its check, because it was never entered or because the block raised, emits a `ChangeWarning` at the line that made it. A test that fails stays quiet, so the warning never hides the real failure. A context can be reused, one `with` block at a time, and entering one that is already in a block raises `RuntimeError`; a block that wasn't checked is still reported, even if a later block passes. Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
+Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`: return a comparable value, as in `changes(lambda: a.tolist())`.
 
-For async code, use a plain `with` around the `await`:
+
+## Warnings
+A `ChangeWarning` flags two things:
+
+- **Unchecked contexts.** When a test returns, each `changes()` or `unchanged()` made during it (fixtures and `setUp` included) that didn't run its check, because it was never entered or because the block raised, emits a warning at the line that made it. A reused context's unchecked block is still reported, even if a later block passes.
+- **Uncopyable values.** Values that can't be fully copied before the block, such as objects without `__eq__` or values holding something uncopyable, such as a lock.
+
+A test that fails stays quiet, so the warning never hides the real failure.
+
+Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
+
+
+## Async
+Use a plain `with` around the `await`:
 ```python
 with changes(lambda: cart.total, by=15):
     await cart.add_async(item)
