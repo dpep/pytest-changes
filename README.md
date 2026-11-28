@@ -47,7 +47,7 @@ changes(user, "status", to="active")
 changes(cart, "total", by=20)
 ```
 
-For anything with a length, `by` counts items (characters, for a string):
+With a number or a range, `by` counts items for values with a length (characters, for a string); any other `by`, such as a `Counter` or a vector, is compared with `after - before`:
 ```python
 with changes(lambda: cart.items, by=1):
     cart.add(item)
@@ -67,7 +67,7 @@ with changes(lambda: queue, by=range(1, 4)):
 E       pytest_changes.ChangeAssertionError: queue: expected Δ in 1..3, got Δ +4 (len 0 → 4)
 ```
 
-With `as c`, `c.before` and `c.after` hold the values read on entering and leaving the block. `c.delta` is `len(after) - len(before)` for anything with a length, else `after - before`, and raises `TypeError` when neither works.
+With `as c`, `c.before` and `c.after` hold the values read on entering and leaving the block. `c.delta` is `after - before`, or `len(after) - len(before)` for values that don't subtract, such as lists and strings, and raises `TypeError` when neither works.
 
 #### Unchanged
 Assert that nothing changed:

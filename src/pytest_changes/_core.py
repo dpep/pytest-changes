@@ -111,21 +111,24 @@ class ChangeContext:
 
     @property
     def delta(self) -> Any:
-        """`len(after) - len(before)` for values with a length, else `after - before`."""
-        return self._delta("delta")[0]
+        """`after - before`, or `len(after) - len(before)` for values that don't subtract."""
+        return self._delta("delta", count=False)[0]
 
-    def _delta(self, needed_by: str) -> tuple[Any, bool]:
-        """The delta, and whether it counts items."""
+    def _delta(self, needed_by: str, count: bool) -> tuple[Any, bool]:
+        """The delta, and whether it counts items; `count` tries lengths before subtracting."""
         __tracebackhide__ = True
         after, before = self.after, self.before
-        # length first: sets subtract too, but by=1 means one more item
         try:
-            return len(after) - len(before), True
+            lengths = len(after) - len(before)
         except TypeError:
-            pass
+            lengths = None
+        if count and lengths is not None:
+            return lengths, True
         try:
             return after - before, False
         except TypeError:
+            if lengths is not None:
+                return lengths, True
             raise TypeError(
                 f"{self.label}: {needed_by} needs values with a length or that subtract "
                 f"({type(after).__name__} - {type(before).__name__} failed)"
@@ -244,8 +247,9 @@ class ChangeContext:
 
     def _check_delta(self) -> str | None:
         __tracebackhide__ = True
-        delta, counts = self._delta("by=")
         by = self._by
+        # by=1 on a set means one more item, not a set difference
+        delta, counts = self._delta("by=", count=isinstance(by, numbers.Number | range))
         if delta in by if isinstance(by, range) else equal(by, delta):
             return None
         if isinstance(by, range) and by.step == 1:

@@ -1,5 +1,7 @@
+import collections
 from datetime import timedelta
 from decimal import Decimal
+from typing import NamedTuple
 from unittest import mock
 
 import pytest
@@ -175,10 +177,20 @@ class TestByLength:
         with changes(log, "value", by=3):
             log.value += "cde"
 
-    def test_length_wins_over_subtraction(self):
+    def test_a_number_counts_items_even_when_values_subtract(self):
         box = Counter(Sized(1))
         with changes(box, "value", by=1):
             box.value = Sized(2, sub=100)
+
+    def test_any_other_by_subtracts(self):
+        stock = Counter(collections.Counter(apple=1))
+        with changes(stock, "value", by=collections.Counter(apple=2)):
+            stock.value = collections.Counter(apple=3)
+
+    def test_vectors_subtract(self):
+        pos = Counter(Vec(0, 0))
+        with changes(pos, "value", by=Vec(3, 4)):
+            pos.value = Vec(3, 4)
 
     def test_unsized_len_falls_back_to_subtraction(self):
         # numpy's 0-d arrays define __len__ but raise TypeError from it
@@ -225,6 +237,14 @@ class Sized:
 
     def __eq__(self, other):
         return self.n == other.n
+
+
+class Vec(NamedTuple):
+    x: int
+    y: int
+
+    def __sub__(self, other):
+        return Vec(self.x - other.x, self.y - other.y)
 
 
 class Unsized(Sized):
@@ -347,11 +367,18 @@ class TestInspect:
         assert (c.before, c.after, c.delta) == (0, 3, 3)
         assert c.label == "counter.value"
 
-    def test_delta_counts_items(self):
+    def test_delta_counts_items_of_values_that_dont_subtract(self):
         books = ["a"]
         with changes(lambda: books) as c:
             books.append("b")
         assert c.delta == 1
+
+    def test_delta_subtracts_values_that_do(self):
+        tags, pos = Counter({"a"}), Counter(Vec(0, 0))
+        with changes(tags, "value") as t, changes(pos, "value") as p:
+            tags.value = {"a", "b"}
+            pos.value = Vec(3, 4)
+        assert (t.delta, p.delta) == ({"b"}, Vec(3, 4))
 
     def test_delta_of_values_neither_sized_nor_subtractable_raises(self):
         shelf = Counter(None)
