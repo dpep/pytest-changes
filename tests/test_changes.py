@@ -370,12 +370,15 @@ class TestInspect:
     def test_after_is_unset_when_the_block_raises(self, counter):
         with pytest.warns(ChangeWarning), pytest.raises(ValueError), changes(counter, "value") as c:
             raise ValueError
-        assert not hasattr(c, "after")
+        with pytest.raises(AttributeError) as e:
+            c.after  # noqa: B018
+        assert str(e.value) == "after isn't set: it wasn't read because the block raised"
 
     def test_after_is_unset_when_the_test_is_skipped(self, counter):
         with pytest.raises(pytest.skip.Exception), changes(counter, "value") as c:
             pytest.skip("not today")
-        assert not hasattr(c, "after")
+        with pytest.raises(AttributeError, match="because the block raised"):
+            c.delta  # noqa: B018
 
 
 class TestBlockErrors:

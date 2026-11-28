@@ -72,6 +72,7 @@ class ChangeContext:
         self._by = by
         self._before: Any = MISSING
         self._after: Any = MISSING
+        self._after_unset = "it's read when the with block exits"
         self._entered = False
         _plugin.track(self)
 
@@ -105,7 +106,7 @@ class ChangeContext:
     def after(self) -> Any:
         """The value read when the block exited."""
         if self._after is MISSING:
-            raise AttributeError("after isn't set: it's read when the with block exits")
+            raise AttributeError(f"after isn't set: {self._after_unset}")
         return self._after
 
     @property
@@ -155,6 +156,7 @@ class ChangeContext:
         __tracebackhide__ = True
         # an inner context's failure isn't the block raising: check, and merge into it
         if exc is not None and not isinstance(exc, ChangeAssertionError):
+            self._after_unset = "it wasn't read because the block raised"
             # what pytest.raises is used for; pytest outcomes and KeyboardInterrupt end the test
             if isinstance(exc, Exception | SystemExit):
                 error = type(exc).__name__
