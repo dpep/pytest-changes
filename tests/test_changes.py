@@ -461,7 +461,7 @@ class TestBlockErrors:
         assert type(e.value) is AssertionError
 
 
-class TestEnteredOnce:
+class TestReentry:
     @UNCHECKED
     def test_nesting_the_same_context_raises(self, counter):
         context = changes(counter, "value", by=2)
@@ -469,15 +469,39 @@ class TestEnteredOnce:
             with context:
                 pass
         assert str(e.value) == (
-            "changes() can only be entered once: call changes() again for each with block"
+            "changes() is already in a with block: call changes() again for a nested one"
         )
 
-    def test_reuse_raises(self, counter):
+    def test_sequential_reuse_checks_each_block_afresh(self, counter):
         context = unchanged(counter, "value")
         with context:
             pass
-        with pytest.raises(RuntimeError, match=r"^unchanged\(\) can only be entered once"):
-            context.__enter__()
+        with pytest.raises(ChangeAssertionError) as e, context:
+            counter.value = 1
+            with pytest.raises(AttributeError, match="read when the with block exits"):
+                context.after  # noqa: B018
+        assert message(e) == "counter.value: expected no change, got 0 → 1"
+        with context:
+            pass
+        assert (context.before, context.after) == (1, 1)
+
+    def test_a_clean_reuse_clears_an_earlier_skip(self, pytester):
+        pytester.makepyfile(
+            """
+            import pytest
+            from pytest_changes import unchanged
+
+            def test_it():
+                box = [1]
+                context = unchanged(lambda: box)
+                with pytest.raises(ValueError), context:
+                    raise ValueError
+                with context:
+                    pass
+            """
+        )
+        result = pytester.runpytest_subprocess("-W", "error::pytest_changes.ChangeWarning")
+        result.assert_outcomes(passed=1)
 
 
 class TestInvalidCombos:

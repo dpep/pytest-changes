@@ -74,6 +74,7 @@ class ChangeContext:
         self._after: Any = MISSING
         self._after_unset = "it's read when the with block exits"
         self._entered = False
+        self._active = False
         self._skipped_by: str | None = None
         _plugin.track(self)
 
@@ -141,18 +142,23 @@ class ChangeContext:
 
     def __enter__(self) -> Self:
         __tracebackhide__ = True
-        if self._entered:
+        if self._active:
             raise RuntimeError(
-                f"{self._name}() can only be entered once: "
-                f"call {self._name}() again for each with block"
+                f"{self._name}() is already in a with block: "
+                f"call {self._name}() again for a nested one"
             )
+        # each block is checked afresh, so a context can be reused one block at a time
         self._entered = True
+        self._skipped_by = None
+        self._before = self._after = MISSING
+        self._after_unset = "it's read when the with block exits"
         # after is read and compared at once, so only before needs protecting from the block
         value = self._read("before the block")
         try:
             self._before, self._complete = snapshot(value)
         except Incomparable:
             raise self._incomparable(value) from None
+        self._active = True
         return self
 
     def __exit__(
@@ -162,6 +168,7 @@ class ChangeContext:
         tb: TracebackType | None,
     ) -> None:
         __tracebackhide__ = True
+        self._active = False
         # an inner context's failure isn't the block raising: check, and merge into it
         if exc is not None and not isinstance(exc, ChangeAssertionError):
             self._after_unset = "it wasn't read because the block raised"

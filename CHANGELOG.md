@@ -7,7 +7,7 @@
 - `by=0` raises `TypeError`: use `unchanged()`. Matchers that accept 0, such as `pytest.approx(0, abs=1)` or `mock.ANY`, are allowed.
 - `c.before`, `c.after` and `c.delta` expose the values. `c.delta` is `after - before`, or the change in length for values that don't subtract, such as lists; it raises `TypeError` when neither works. `c.after` raises `AttributeError` until the block exits, or if the block raised.
 - If the block raises, the check is skipped and the exception propagates untouched. To check an error path, put the expectation outside `pytest.raises`: `with unchanged(lambda: acct.balance), pytest.raises(InsufficientFunds):`.
-- Each `changes(...)` or `unchanged(...)` can be entered once; entering it again raises `RuntimeError`.
+- A `changes(...)` or `unchanged(...)` can be reused one `with` block at a time, so a list of expectations works with `parametrize`: each block checks afresh, and entering one that is already in a block raises `RuntimeError`.
 - Stacked contexts in one `with` report every failed expectation in a single error.
 - The value is snapshotted before the block, so a list or dict mutated in place counts as a change.
 - Without `to=` or `by=`, when the value can't be fully copied (an object without `__eq__`, a container of them, or one holding something uncopyable such as a lock), a pass emits a `pytest_changes.ChangeWarning` and a failure adds the same hint: write a getter for the state you mean, such as `lambda: vars(user)`.
