@@ -92,3 +92,63 @@ class TestInspect:
         with changes(lambda: tags, label="tags") as c:
             tags.add("b")
         assert c.delta == {"b"}
+
+
+class Truthless:
+    def __bool__(self):
+        raise ValueError("The truth value of an array with more than one element is ambiguous")
+
+
+class Array:
+    """Like a numpy array: comparisons return an object with no truth value."""
+
+    def __init__(self, *values):
+        self.values = list(values)
+
+    def __eq__(self, other):
+        return Truthless()
+
+    def __ne__(self, other):
+        return Truthless()
+
+    __hash__ = None
+
+
+AMBIGUOUS = (
+    "a: Array doesn't compare to a bool; "
+    "return a comparable value from the getter, such as a list or tuple"
+)
+
+
+class TestComparisonWithoutTruth:
+    def test_changes(self):
+        a = Array(0, 0)
+        with pytest.raises(TypeError) as e, changes(lambda: a):
+            a.values[0] = 1
+        assert str(e.value) == AMBIGUOUS
+        assert e.value.__suppress_context__
+
+    def test_unchanged(self):
+        a = Array(0, 0)
+        with pytest.raises(TypeError) as e, unchanged(lambda: a):
+            pass
+        assert str(e.value) == AMBIGUOUS
+
+    def test_to(self):
+        a = Array(0, 0)
+        with pytest.raises(TypeError) as e, changes(lambda: a, to=[1, 0]):
+            a = Array(1, 0)
+        assert str(e.value) == AMBIGUOUS
+
+    def test_uncopyable_value_is_not_masked(self):
+        class Uncopyable(Array):
+            def __deepcopy__(self, memo):
+                raise TypeError("no deepcopy")
+
+            def __copy__(self):
+                raise TypeError("no copy")
+
+        a = Uncopyable(0)
+        with pytest.raises(TypeError) as e, changes(lambda: a, label="a"):
+            a.values[0] = 1
+        assert str(e.value) == AMBIGUOUS.replace("Array", "Uncopyable")

@@ -7,7 +7,7 @@ from types import TracebackType
 from typing import Any, Self
 
 from . import _label, _plugin
-from ._snapshot import snapshot
+from ._snapshot import Incomparable, equal, snapshot
 
 
 class _Missing:
@@ -98,7 +98,11 @@ class ChangeContext:
     def __enter__(self) -> Self:
         __tracebackhide__ = True
         # after is read and compared at once, so only before needs protecting from the block
-        self._before = snapshot(self._read("before the block"))
+        value = self._read("before the block")
+        try:
+            self._before = snapshot(value)
+        except Incomparable:
+            raise self._incomparable(value) from None
         return self
 
     def __exit__(
@@ -112,7 +116,10 @@ class ChangeContext:
             return
 
         self._after = self._read("after the block completed")
-        detail = self._check()
+        try:
+            detail = self._check()
+        except Incomparable:
+            raise self._incomparable(self._after) from None
         if detail is None:
             return
         if exc is not None:
@@ -120,6 +127,12 @@ class ChangeContext:
             exc.failures.insert(0, (self.label, detail))
             return
         raise ChangeAssertionError(self.label, detail)
+
+    def _incomparable(self, value: Any) -> TypeError:
+        return TypeError(
+            f"{self.label}: {type(value).__name__} doesn't compare to a bool; "
+            "return a comparable value from the getter, such as a list or tuple"
+        )
 
     def _read(self, when: str) -> Any:
         try:
@@ -131,7 +144,7 @@ class ChangeContext:
     def _check(self) -> str | None:
         __tracebackhide__ = True
         before, after = self._before, self._after
-        changed = before != after
+        changed = not equal(before, after)
 
         if not self._expect_change:
             if not changed:
@@ -143,7 +156,7 @@ class ChangeContext:
             return self._check_delta()
 
         if self._to is not MISSING:
-            if changed and self._to == after:
+            if changed and equal(self._to, after):
                 return None
             r, explanation = _plugin.compare(after, self._to)
             return _explained(f"expected → {r(self._to)}, {self._actual(changed, r)}", explanation)
@@ -162,10 +175,10 @@ class ChangeContext:
                 )
             raise TypeError(message) from None
 
-        if self._by == delta:
+        if equal(self._by, delta):
             return None
         expected = f"Δ {_signed(self._by)}"
-        if self.before != self.after:
+        if not equal(self.before, self.after):
             return f"expected {expected}, got Δ {_signed(delta)} ({self.before!r} → {self.after!r})"
         return f"expected {expected}, did not change (stayed {self.before!r})"
 
