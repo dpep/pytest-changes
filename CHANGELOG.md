@@ -6,7 +6,7 @@
 - `by=range(1, 4)` passes when the delta is 1, 2 or 3; like `in`, the stop is excluded. Failures read `expected Δ in 1..3, got Δ +4 (0 → 4)`. An empty range raises `ValueError`.
 - `by=0`, or a matcher equal to 0 such as `pytest.approx(0)`, raises `TypeError`: use `unchanged()`.
 - `c.before`, `c.after` and `c.delta` expose the values. `c.delta` raises `TypeError` for values that have no length and can't be subtracted. `c.after` raises `AttributeError` until the block exits.
-- When the block raises an `Exception`, `changes` and `unchanged` still check. A failed check raises `ChangeAssertionError` chained from the block's exception; a passing check lets that exception through, so `with pytest.raises(LoginError), changes(lambda: user.failed_attempts, by=1):` asserts both. `KeyboardInterrupt`, `pytest.skip` and other non-`Exception` errors skip the check.
+<!-- TODO: rewrite once the skip-on-raise revert lands -->
 - Stacked contexts in one `with` report every failed expectation in a single error.
 - The value is snapshotted before the block, so a list or dict mutated in place counts as a change.
 - Objects without `__eq__` compare by identity: pass a getter such as `lambda: vars(user)` to compare their state. When a passing result may rest on identity, a `pytest_changes.ChangeWarning` says so, and a failure adds the same hint.

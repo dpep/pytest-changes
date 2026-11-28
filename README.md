@@ -81,19 +81,7 @@ with unchanged(audit, "count"):
 `by=0`, or a matcher equal to 0 such as `pytest.approx(0)`, raises `TypeError`: use `unchanged()` instead.
 
 #### When the block raises
-`changes` and `unchanged` still check, so pair them with `pytest.raises` to assert what a failed operation did, and didn't, leave behind:
-```python
-with pytest.raises(ValueError), unchanged(lambda: account.balance):
-    account.withdraw(500)
-
-with pytest.raises(LoginError), changes(lambda: user.failed_attempts, by=1):
-    user.login("wrong password")
-```
-```
-E       pytest_changes.ChangeAssertionError: account.balance: expected no change, got 100 → -400
-```
-
-A failed check is chained from the block's exception. A passing check lets the exception through for `pytest.raises` to catch.
+TODO: rewrite from real runs once the skip-on-raise revert lands (teach `with unchanged(...), pytest.raises(...):`).
 
 #### Stacking
 Stack expectations in one `with`, and every failure is reported:
