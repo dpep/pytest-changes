@@ -195,3 +195,41 @@ class TestGetterRaised:
                 ),
             ]
         )
+
+
+MADE_AT_IMPORT = """
+    import pytest
+    from pytest_changes import changes, unchanged
+
+    state = {"n": 0}
+    EXPECTATIONS = [changes(lambda: state["n"]), unchanged(lambda: state["n"], label="same")]
+
+    @pytest.mark.parametrize("ctx", EXPECTATIONS)
+    def test_raised(ctx):
+        with pytest.raises(ValueError), ctx:
+            raise ValueError
+
+    def test_checked_after_a_skip_in_another_test():
+        with EXPECTATIONS[0]:
+            state["n"] += 1
+
+    @pytest.mark.parametrize("ctx", EXPECTATIONS)
+    def test_never_entered(ctx):
+        pass
+"""
+
+
+class TestMadeAtImport:
+    def test_warns_in_the_test_that_entered_it(self, pytester):
+        pytester.makepyfile(MADE_AT_IMPORT)
+        result = pytester.runpytest_subprocess("-p", "no:randomly")
+        result.assert_outcomes(passed=5, warnings=2)
+        # [[] matches a literal [ in fnmatch
+        result.stdout.fnmatch_lines(
+            [
+                "*::test_raised[[]ctx0[]]",
+                "*.py:5: ChangeWarning: state[[]'n']: wasn't checked because the block raised*",
+                "*::test_raised[[]ctx1[]]",
+                "*.py:5: ChangeWarning: same: wasn't checked because the block raised*",
+            ]
+        )

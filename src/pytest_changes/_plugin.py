@@ -19,19 +19,22 @@ def pytest_unconfigure(config: pytest.Config) -> None:
     _configs.remove(config)
 
 
-# contexts constructed by each running test, from setup through the call; innermost
+# contexts made or entered by each running test, from setup through the call; innermost
 # (pytester) run last
-_constructed: list[list[Any]] = []
+_tracked: list[list[Any]] = []
 
 
-def track(context: Any) -> None:
-    if _constructed:
-        _constructed[-1].append(context)
+def track(context: Any) -> bool:
+    """Attribute `context` to the running test; True if it wasn't already."""
+    if not _tracked or any(c is context for c in _tracked[-1]):
+        return False
+    _tracked[-1].append(context)
+    return True
 
 
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_setup(item: pytest.Item) -> Any:
-    _constructed.append([])
+    _tracked.append([])
     return (yield)
 
 
@@ -42,7 +45,7 @@ def pytest_runtest_call(item: pytest.Item) -> Any:
     # only when the test returned: a test that raised never reached its with lines.
     # unittest records failures on the item instead of raising them
     if not getattr(item, "_excinfo", None):
-        for context in _constructed[-1]:
+        for context in _tracked[-1]:
             context.warn_if_unchecked()
     return result
 
@@ -50,7 +53,7 @@ def pytest_runtest_call(item: pytest.Item) -> Any:
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_teardown(item: pytest.Item) -> Any:
     # teardown runs whenever setup did, even when setup or the call failed
-    _constructed.pop()
+    _tracked.pop()
     return (yield)
 
 

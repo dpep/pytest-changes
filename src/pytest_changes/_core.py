@@ -146,6 +146,9 @@ class ChangeContext:
             )
         # each block is checked afresh, so a context can be reused one block at a time
         self._entered = True
+        if _plugin.track(self):
+            # made outside this test (at import, say): earlier tests' blocks aren't its concern
+            self._unchecked = None
         self._before = self._after = MISSING
         self._after_unset = "it's read when the with block exits"
         # after is read and compared at once, so only before needs protecting from the block
