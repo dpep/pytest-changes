@@ -193,6 +193,27 @@ class TestComparisonWithoutTruth:
             a = Array(1, 0)
         assert str(e.value) == AMBIGUOUS
 
+    def test_to_value_is_blamed(self):
+        box = [1, 2]
+        with pytest.raises(TypeError) as e, changes(lambda: box, to=Array(1, 2, 3)):
+            box = [1, 2, 3]
+        assert str(e.value) == (
+            "box: to= Array doesn't compare to a bool; "
+            "pass a comparable to= value, such as a list or tuple"
+        )
+
+    def test_stacked_failures_stay_visible(self):
+        box, other = {"a": [0]}, [1]
+        with (
+            pytest.raises(TypeError) as e,
+            changes(lambda: box["a"], label="a"),
+            unchanged(lambda: other, label="other"),
+        ):
+            box["a"] = Array(0)
+            other.append(2)
+        assert str(e.value) == AMBIGUOUS
+        assert str(e.value.__cause__) == "other: expected no change, got [1] → [1, 2]"
+
     def test_uncopyable_value_is_not_masked(self):
         class Uncopyable(Array):
             def __deepcopy__(self, memo):

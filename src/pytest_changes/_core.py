@@ -164,8 +164,9 @@ class ChangeContext:
         self._after = self._read("after the block")
         try:
             detail = self._check()
-        except Incomparable:
-            raise self._incomparable(self._after) from None
+        except Incomparable as e:
+            # chained from an inner context's failure, so it stays visible
+            raise self._incomparable(self._after, *e.args) from exc
         hint = self._copy_hint()
         if detail is None:
             if hint is not None:
@@ -188,11 +189,12 @@ class ChangeContext:
             "reflect its contents: write a getter for the state you mean"
         )
 
-    def _incomparable(self, value: Any) -> TypeError:
-        return TypeError(
-            f"{self.label}: {type(value).__name__} doesn't compare to a bool; "
+    def _incomparable(self, value: Any, reason: str | None = None) -> TypeError:
+        reason = reason or (
+            f"{type(value).__name__} doesn't compare to a bool; "
             "return a comparable value from the getter, such as a list or tuple"
         )
+        return TypeError(f"{self.label}: {reason}")
 
     def _read(self, when: str) -> Any:
         try:
@@ -216,9 +218,16 @@ class ChangeContext:
             return self._check_delta()
 
         if self._to is not MISSING:
-            if changed and equal(self._to, after):
+            try:
+                reached = equal(self._to, after)
+            except Incomparable:
+                raise Incomparable(
+                    f"to= {type(self._to).__name__} doesn't compare to a bool; "
+                    "pass a comparable to= value, such as a list or tuple"
+                ) from None
+            if reached and changed:
                 return None
-            if not changed and equal(self._to, after):
+            if reached:
                 short = _plugin.short_repr
                 return f"expected to change to {short(self._to)}, but it was already {short(after)}"
             r, explanation = _plugin.compare(after, self._to)
