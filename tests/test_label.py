@@ -1,6 +1,7 @@
 import ast
 import importlib.util
 import itertools
+import weakref
 
 import pytest
 
@@ -151,7 +152,7 @@ class TestFallback:
         exec(code, namespace)  # noqa: S102
         assert namespace["a"].label == "<lambda at <string>:1>"
         assert namespace["b"].label == "<Cart>.total"
-        assert namespace["c"].label == "<count at test_label.py:15>"
+        assert namespace["c"].label == "<count at test_label.py:16>"
 
     def test_call_shape_mismatch(self):
         # partial makes the call site a different call
@@ -199,6 +200,43 @@ class TestFallback:
 
         monkeypatch.setattr(_label, "_from_source", lambda *args: None)
         assert changes(Getter()).label == "<Getter>"
+
+
+class TestLazy:
+    def test_passing_block_reads_no_source(self, monkeypatch):
+        monkeypatch.setattr(_label, "_index", lambda *a: pytest.fail("read source"))
+        cart = Cart()
+        with changes(cart, "total", by=1), changes(lambda: cart.total), changes(cart.count, by=0):
+            cart.total += 1
+
+    def test_resolves_after_the_callers_frame_is_gone(self):
+        def build():
+            cart = Cart()
+            return changes(cart, "total", by=1), changes(cart.count, by=1), cart
+
+        total, count, cart = build()
+        with pytest.raises(ChangeAssertionError) as e, total, count:
+            cart.total += 2
+        assert str(e.value) == (
+            "2 change expectations failed\n"
+            "  ✗ cart.total    expected Δ +1, got Δ +2 (0 → 2)\n"
+            "  ✗ cart.count()  expected Δ +1, did not change (stayed 0)"
+        )
+
+    def test_holds_no_frame(self):
+        def build():
+            bystander = Cart()
+            return changes(CART, "total"), weakref.ref(bystander)
+
+        context, ref = build()
+        assert ref() is None
+        assert context.label == "CART.total"
+
+    def test_getter_error_note(self):
+        cart = Cart()
+        with pytest.raises(AttributeError) as e, changes(cart, "missing"):
+            pass
+        assert e.value.__notes__ == ["raised by the getter for cart.missing before the block"]
 
 
 def test_parses_each_file_once(tmp_path, monkeypatch):

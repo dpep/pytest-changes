@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import numbers
 from collections.abc import Callable
 from types import TracebackType
@@ -67,7 +68,10 @@ class ChangeContext:
             raise TypeError("changes() cannot combine by with by_at_least or by_at_most")
 
         self._get = _resolve_getter(getter, attr)
-        self.label = label if label is not None else _label.label(getter, attr)
+        if label is not None:
+            self.label = label
+        else:
+            self._pending_label = _label.Pending(getter, attr)
         self._expect_change = expect_change
         self._to = to
         self._by = by
@@ -75,6 +79,11 @@ class ChangeContext:
         self._by_at_most = by_at_most
         self.before: Any = MISSING
         self.after: Any = MISSING
+
+    @functools.cached_property
+    def label(self) -> str:
+        """Names the expression in failure messages; read from source only when first needed."""
+        return self._pending_label.resolve()
 
     @property
     def delta(self) -> Any:

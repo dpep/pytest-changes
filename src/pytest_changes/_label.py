@@ -17,10 +17,27 @@ _Index = tuple[dict[tuple[int, int], ast.Call], dict[int, list[ast.Lambda]]]
 _indexes: dict[str, _Index | None] = {}
 
 
-def label(getter: Any, attr: str | None) -> str:
+class Pending:
+    """What naming the expression needs, captured cheaply at the call; resolved on demand."""
+
+    def __init__(self, getter: Any, attr: str | None):
+        self.getter = getter
+        self.attr = attr
+        # a lambda names itself; anything else needs the caller's call site
+        self.site = None if _is_lambda(getter, attr) else _call_site()
+
+    def resolve(self) -> str:
+        return label(self.getter, self.attr, self.site)
+
+
+# the caller's code, instruction offset and globals: enough to find the call, without the frame
+_Site = tuple[CodeType, int, dict[str, Any]]
+
+
+def label(getter: Any, attr: str | None, site: _Site | None) -> str:
     """Name the expression the user passed; never raises."""
     try:
-        text = _from_source(getter, attr)
+        text = _from_source(getter, attr, site)
     except Exception:  # noqa: BLE001 - labelling must never break a test
         text = None
     if text is not None:
@@ -31,11 +48,11 @@ def label(getter: Any, attr: str | None) -> str:
         return f"<{type(getter).__name__}>"
 
 
-def _from_source(getter: Any, attr: str | None) -> str | None:
-    if attr is None and getattr(getter, "__name__", None) == "<lambda>":
+def _from_source(getter: Any, attr: str | None, site: _Site | None) -> str | None:
+    if _is_lambda(getter, attr):
         return _lambda_body(getter.__code__, getter.__globals__)
 
-    call = _call_site()
+    call = _find_call(site) if site is not None else None
     # same call shape as changes(obj, "attr") / changes(getter), else it's someone else's call
     if call is None or len(call.args) != (1 if attr is None else 2):
         return None
@@ -50,17 +67,28 @@ def _from_source(getter: Any, attr: str | None) -> str | None:
     return f"{ast.unparse(first)}.{attr}"
 
 
-def _call_site() -> ast.Call | None:
-    frame: FrameType | None = sys._getframe(1)
+def _is_lambda(getter: Any, attr: str | None) -> bool:
+    return attr is None and getattr(getter, "__name__", None) == "<lambda>"
+
+
+def _call_site() -> _Site | None:
+    try:
+        frame: FrameType | None = sys._getframe(1)
+    except Exception:  # noqa: BLE001 - no frame introspection (non-CPython); fall back
+        return None
     while frame is not None and _in_package(frame.f_globals.get("__name__")):
         frame = frame.f_back
     if frame is None:
         return None
-    code = frame.f_code
-    pos = next(itertools.islice(code.co_positions(), frame.f_lasti // 2, None), None)
+    return frame.f_code, frame.f_lasti, frame.f_globals
+
+
+def _find_call(site: _Site) -> ast.Call | None:
+    code, lasti, module_globals = site
+    pos = next(itertools.islice(code.co_positions(), lasti // 2, None), None)
     if pos is None or None in pos:
         return None
-    index = _index(code.co_filename, frame.f_globals)
+    index = _index(code.co_filename, module_globals)
     # match on the end: a multi-line method call's start is moved to the attribute name
     return index[0].get((pos[1], pos[3])) if index else None
 
