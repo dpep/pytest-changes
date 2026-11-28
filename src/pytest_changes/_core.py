@@ -74,17 +74,22 @@ class ChangeContext:
         self._after: Any = MISSING
         self._after_unset = "it's read when the with block exits"
         self._entered = False
+        self._skipped_by: str | None = None
         _plugin.track(self)
 
-    def warn_if_never_entered(self) -> None:
-        """Called by the plugin after the test: like an un-awaited coroutine, it checked nothing."""
-        if self._entered:
+    def warn_if_unchecked(self) -> None:
+        """Called by the plugin when a test returns: like an un-awaited coroutine, it checked nothing."""
+        if not self._entered:
+            message = f"{self._name}() was never entered, so it asserts nothing: use it in a with statement"
+        elif self._skipped_by is not None:
+            error = self._skipped_by
+            message = (
+                f"{self.label}: wasn't checked because the block raised {error}: put the "
+                f"expectation outside pytest.raises: with {self._name}(...), pytest.raises({error}):"
+            )
+        else:
             return
-        warnings.warn_explicit(
-            f"{self._name}() was never entered, so it asserts nothing: use it in a with statement",
-            ChangeWarning,
-            *_label.location(self._site),
-        )
+        warnings.warn_explicit(message, ChangeWarning, *_label.location(self._site))
 
     @property
     def _name(self) -> str:
@@ -160,15 +165,7 @@ class ChangeContext:
         # an inner context's failure isn't the block raising: check, and merge into it
         if exc is not None and not isinstance(exc, ChangeAssertionError):
             self._after_unset = "it wasn't read because the block raised"
-            # what pytest.raises is used for; pytest outcomes and KeyboardInterrupt end the test
-            if isinstance(exc, Exception | SystemExit):
-                error = type(exc).__name__
-                warnings.warn(
-                    f"{self.label}: not checked because the block raised {error}: put the "
-                    f"expectation outside pytest.raises: with {self._name}(...), pytest.raises({error}):",
-                    ChangeWarning,
-                    stacklevel=2,
-                )
+            self._skipped_by = type(exc).__name__
             return
 
         self._after = self._read("after the block")

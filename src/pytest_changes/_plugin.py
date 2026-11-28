@@ -38,7 +38,7 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> Any:
         _constructed.pop()
     # only when the test body returned: a test that raised never reached its with lines
     for context in contexts:
-        context.warn_if_never_entered()
+        context.warn_if_unchecked()
     return result
 
 

@@ -6,7 +6,10 @@ from unittest import mock
 
 import pytest
 
-from pytest_changes import ChangeAssertionError, ChangeWarning, changes, unchanged
+from pytest_changes import ChangeAssertionError, changes, unchanged
+
+# the block raises inside pytest.raises, so the plugin warns when the test returns
+UNCHECKED = pytest.mark.filterwarnings("ignore::pytest_changes.ChangeWarning")
 
 
 class Counter:
@@ -411,13 +414,15 @@ class TestInspect:
             with pytest.raises(AttributeError, match="read when the with block exits"):
                 c.delta  # noqa: B018
 
+    @UNCHECKED
     def test_after_is_unset_when_the_block_raises(self, counter):
-        with pytest.warns(ChangeWarning), pytest.raises(ValueError), changes(counter, "value") as c:
+        with pytest.raises(ValueError), changes(counter, "value") as c:
             raise ValueError
         with pytest.raises(AttributeError) as e:
             c.after  # noqa: B018
         assert str(e.value) == "after isn't set: it wasn't read because the block raised"
 
+    @UNCHECKED
     def test_after_is_unset_when_the_test_is_skipped(self, counter):
         with pytest.raises(pytest.skip.Exception), changes(counter, "value") as c:
             pytest.skip("not today")
@@ -426,16 +431,13 @@ class TestInspect:
 
 
 class TestBlockErrors:
+    @UNCHECKED
     def test_skips_the_check_and_lets_the_error_through_untouched(self, counter):
         error = ValueError()
-        with (
-            pytest.warns(ChangeWarning, match=r"^counter.value: not checked") as record,
-            pytest.raises(ValueError) as e,
-            changes(counter, "value", by=1),
-        ):
+        with pytest.raises(ValueError) as e, changes(counter, "value", by=1):
             raise error
         assert e.value is error
-        assert str(record[0].message).endswith("with changes(...), pytest.raises(ValueError):")
+        assert e.value.__context__ is None
 
     def test_expectation_outside_pytest_raises_checks_the_error_path(self):
         log = []
@@ -452,20 +454,18 @@ class TestBlockErrors:
                 raise ValueError
         assert message(e) == "len(log): expected Δ +1, did not change (stayed 1)"
 
+    @UNCHECKED
     def test_plain_assertion_errors_pass_through(self, counter):
-        with (
-            pytest.warns(ChangeWarning),
-            pytest.raises(AssertionError) as e,
-            changes(counter, "value", by=1),
-        ):
+        with pytest.raises(AssertionError) as e, changes(counter, "value", by=1):
             raise AssertionError("mine")
         assert type(e.value) is AssertionError
 
 
 class TestEnteredOnce:
+    @UNCHECKED
     def test_nesting_the_same_context_raises(self, counter):
         context = changes(counter, "value", by=2)
-        with pytest.warns(ChangeWarning), pytest.raises(RuntimeError) as e, context:  # noqa: SIM117
+        with pytest.raises(RuntimeError) as e, context:  # noqa: SIM117
             with context:
                 pass
         assert str(e.value) == (

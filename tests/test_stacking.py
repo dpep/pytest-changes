@@ -1,6 +1,6 @@
 import pytest
 
-from pytest_changes import ChangeAssertionError, ChangeWarning, changes, unchanged
+from pytest_changes import ChangeAssertionError, changes, unchanged
 
 
 class Cart:
@@ -42,16 +42,18 @@ def test_reports_every_failure_in_source_order():
 
 
 class TestBlockRaises:
-    def test_every_context_warns_and_the_error_propagates(self):
+    @pytest.mark.filterwarnings("ignore::pytest_changes.ChangeWarning")  # unchecked by design
+    def test_every_context_skips_and_the_error_propagates(self):
         cart, audit = Cart(), Audit()
         with (
-            pytest.warns(ChangeWarning) as record,
             pytest.raises(ValueError),
-            changes(cart, "total", by=20),
-            unchanged(audit, "count"),
+            changes(cart, "total", by=20) as total,
+            unchanged(audit, "count") as count,
         ):
             raise ValueError("boom")
-        assert [str(w.message).split(":")[0] for w in record] == ["audit.count", "cart.total"]
+        for c in (total, count):
+            with pytest.raises(AttributeError, match="because the block raised"):
+                c.after  # noqa: B018
 
 
 def test_nested_failures_merge():
