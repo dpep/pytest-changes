@@ -132,6 +132,11 @@ class ChangeContext:
 
     def __enter__(self) -> Self:
         __tracebackhide__ = True
+        if self._entered:
+            raise RuntimeError(
+                f"{self._name}() can only be entered once: "
+                f"call {self._name}() again for each with block"
+            )
         self._entered = True
         # after is read and compared at once, so only before needs protecting from the block
         value = self._read("before the block")

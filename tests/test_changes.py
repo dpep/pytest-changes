@@ -415,6 +415,24 @@ class TestBlockErrors:
         assert type(e.value) is AssertionError
 
 
+class TestEnteredOnce:
+    def test_nesting_the_same_context_raises(self, counter):
+        context = changes(counter, "value", by=2)
+        with pytest.warns(ChangeWarning), pytest.raises(RuntimeError) as e, context:  # noqa: SIM117
+            with context:
+                pass
+        assert str(e.value) == (
+            "changes() can only be entered once: call changes() again for each with block"
+        )
+
+    def test_reuse_raises(self, counter):
+        context = unchanged(counter, "value")
+        with context:
+            pass
+        with pytest.raises(RuntimeError, match=r"^unchanged\(\) can only be entered once"):
+            context.__enter__()
+
+
 class TestInvalidCombos:
     def test_to_and_by(self, counter):
         with pytest.raises(TypeError, match="cannot combine to and by"):
