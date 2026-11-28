@@ -250,6 +250,12 @@ class ChangeContext:
         by = self._by
         # by=1 on a set means one more item, not a set difference
         delta, counts = self._delta("by=", count=isinstance(by, numbers.Number | range))
+        if isinstance(by, range) and not isinstance(delta, numbers.Integral):
+            # an interval check would read as a contradiction: "Δ in 1..2, got Δ +1.5"
+            raise TypeError(
+                f"{self.label}: by={by!r} needs whole-number deltas; "
+                "for other values assert on c.delta"
+            )
         if delta in by if isinstance(by, range) else equal(by, delta):
             return None
         if isinstance(by, range) and by.step == 1:

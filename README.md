@@ -58,7 +58,7 @@ Values compare with `==`, expected value first, so matchers such as `pytest.appr
 changes(account, "balance", by=pytest.approx(0.1))
 ```
 
-For a range, pass one. Like `in`, the stop is excluded, so this passes for 1, 2 or 3 new jobs:
+For a range, pass one. Like `in`, the stop is excluded, so this passes for 1, 2 or 3 new jobs. The delta must be an integer; a float or `Decimal` delta raises `TypeError`, so assert on `c.delta` instead:
 ```python
 with changes(lambda: queue, by=range(1, 4)):
     queue.push_many(jobs)
