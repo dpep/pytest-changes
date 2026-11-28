@@ -143,7 +143,9 @@ class TestWhereBuilt:
         pytester.makepyfile(WHERE_BUILT.format(use=False))
         result = pytester.runpytest_subprocess("-W", "error::pytest_changes.ChangeWarning")
         result.assert_outcomes(failed=8)
-        assert result.stdout.str().count("ChangeWarning: changes() was never entered") == 7
+        # the E lines, since the short summary repeats messages untruncated under CI=true
+        raised = [line for line in result.outlines if line.startswith("E ")]
+        assert sum("ChangeWarning: changes() was never entered" in line for line in raised) == 7
 
     def test_used_contexts_stay_quiet(self, pytester):
         pytester.makepyfile(WHERE_BUILT.format(use=True))
