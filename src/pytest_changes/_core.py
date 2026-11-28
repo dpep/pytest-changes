@@ -66,8 +66,8 @@ class ChangeContext:
         if "by" in given and given & {"by_at_least", "by_at_most"}:
             raise TypeError("changes() cannot combine by with by_at_least or by_at_most")
 
-        self._get, default_label = _resolve_getter(getter, attr)
-        self.label = label if label is not None else default_label
+        self._get = _resolve_getter(getter, attr)
+        self.label = label if label is not None else _label.label(getter, attr)
         self._expect_change = expect_change
         self._to = to
         self._by = by
@@ -209,17 +209,17 @@ def unchanged(getter: Any, attr: str | None = None, *, label: str | None = None)
     return ChangeContext(getter, attr, expect_change=False, label=label)
 
 
-def _resolve_getter(getter: Any, attr: str | None) -> tuple[Callable[[], Any], str]:
+def _resolve_getter(getter: Any, attr: str | None) -> Callable[[], Any]:
     # attr given means object form, even when the object is itself callable (e.g. a Mock)
     if attr is not None:
-        return (lambda: getattr(getter, attr)), _label.label(getter, attr)
+        return lambda: getattr(getter, attr)
 
     if not callable(getter):
         raise TypeError(
             f"changes() needs a callable getter or an object and attribute name, "
             f"got {type(getter).__name__}"
         )
-    return getter, _label.label(getter, None)
+    return getter
 
 
 def _signed(value: Any) -> str:
