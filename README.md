@@ -47,7 +47,7 @@ changes(user, "status", to="active")
 changes(cart, "total", by=20)
 ```
 
-For anything with a length, `by` counts items:
+For anything with a length, `by` counts items (characters, for a string):
 ```python
 with changes(lambda: cart.items, by=1):
     cart.add(item)
@@ -78,10 +78,22 @@ with unchanged(audit, "count"):
     audit.read()
 ```
 
-`by=0`, or a matcher equal to 0 such as `pytest.approx(0)`, raises `TypeError`: use `unchanged()` instead.
+`by=0` raises `TypeError`: use `unchanged()` instead.
 
-#### When the block raises
-TODO: rewrite from real runs once the skip-on-raise revert lands (teach `with unchanged(...), pytest.raises(...):`).
+#### Error paths
+If the block raises, the check is skipped and the exception propagates untouched. To check what a failed operation leaves behind, put the expectation outside `pytest.raises`:
+```python
+with unchanged(lambda: account.balance), pytest.raises(ValueError):
+    account.withdraw(500)
+
+with changes(lambda: len(log), by=1), pytest.raises(ValueError):
+    account.withdraw(500)
+```
+```
+E       pytest_changes.ChangeAssertionError: account.balance: expected no change, got 100 → -400
+```
+
+With `pytest.raises` on the outside instead, the expectation is never checked, and a `ChangeWarning` says so.
 
 #### Stacking
 Stack expectations in one `with`, and every failure is reported:
@@ -113,7 +125,7 @@ with changes(cart, "items"):
     cart.items.append(item)
 ```
 
-Objects without `__eq__` compare by identity, so changing their attributes isn't a change. Write a getter for the state you mean, and a `ChangeWarning` flags results that may rest on identity:
+Objects without `__eq__` compare by identity, so changing their attributes isn't a change. A `ChangeWarning` flags values like these that can't be fully copied, along with values holding something uncopyable, such as a lock. Write a getter for the state you mean:
 ```python
 changes(lambda: vars(account))
 changes(lambda: account.balance)
@@ -122,7 +134,7 @@ changes(lambda: id(account))  # if identity really is what you mean
 
 The same goes for ORM models whose `==` compares primary keys: read the field, as in `changes(lambda: User.objects.get(pk=1).status)`. Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`: return a comparable value, as in `changes(lambda: a.tolist())`.
 
-A `changes()` or `unchanged()` never used in a `with` asserts nothing, so it also emits a `ChangeWarning`.
+A `changes()` or `unchanged()` never used in a `with` asserts nothing, so it emits a `ChangeWarning` when the test returns. Each one can be entered once. Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
 
 For async code, use a plain `with` around the `await`:
 ```python

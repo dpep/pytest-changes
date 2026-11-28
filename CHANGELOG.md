@@ -4,8 +4,8 @@
 - `changes` and `unchanged` context managers. Pass a getter, or an object and attribute name; both are positional-only. Constrain a change with `to` or `by`, which can't be combined.
 - `by` and `c.delta` count items for anything with a length (lists, sets, dicts, strings), and subtract otherwise: `changes(lambda: lib.books, by=1)` passes when one book was added. Failures show the lengths: `expected Δ +1, got Δ +2 (len 3 → 5)`.
 - `by=range(1, 4)` passes when the delta is 1, 2 or 3; like `in`, the stop is excluded. Failures read `expected Δ in 1..3, got Δ +4 (0 → 4)`. An empty range raises `ValueError`.
-- `by=` set to a number equal to 0 raises `TypeError`: use `unchanged()`. Matchers such as `pytest.approx(0, abs=1)` or `mock.ANY` work as `by=`.
-- `c.before`, `c.after` and `c.delta` expose the values. `c.delta` raises `TypeError` for values that have no length and can't be subtracted. `c.after` raises `AttributeError` until the block exits, and when the block raised.
+- `by=0` raises `TypeError`: use `unchanged()`. Matchers that accept 0, such as `pytest.approx(0, abs=1)` or `mock.ANY`, are allowed.
+- `c.before`, `c.after` and `c.delta` expose the values. `c.delta` raises `TypeError` for values that have no length and can't be subtracted. `c.after` raises `AttributeError` until the block exits, or if the block raised.
 - If the block raises, the check is skipped and the exception propagates untouched; for an `Exception` or `SystemExit`, a `ChangeWarning` says the expectation wasn't checked. To check an error path, put the expectation outside `pytest.raises`: `with unchanged(lambda: acct.balance), pytest.raises(InsufficientFunds):`.
 - Each `changes(...)` or `unchanged(...)` can be entered once; entering it again raises `RuntimeError`.
 - Stacked contexts in one `with` report every failed expectation in a single error.
