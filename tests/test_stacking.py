@@ -1,6 +1,6 @@
 import pytest
 
-from pytest_changes import ChangeAssertionError, changes, unchanged
+from pytest_changes import ChangeAssertionError, ChangeWarning, changes, unchanged
 
 
 class Cart:
@@ -67,3 +67,34 @@ def test_nested_failures_merge():
         "  ✗ audit.count  expected Δ +5, got Δ +1 (4 → 5)\n"
         "  ✗ audit.count  expected no change, got 4 → 5"
     )
+
+
+class TestInnerWarningAsError:
+    """Under `-W error`, an inner context's copy hint raises from its __exit__."""
+
+    class NoEq:
+        pass
+
+    @pytest.mark.filterwarnings("error::pytest_changes.ChangeWarning")
+    def test_outer_still_checks_and_chains_from_the_warning(self):
+        cart, box = Cart(), [self.NoEq()]
+        with (
+            pytest.raises(ChangeAssertionError) as e,
+            changes(cart, "total", by=20),
+            changes(lambda: box[0]),
+        ):
+            cart.total += 15
+            box[0] = self.NoEq()
+        assert str(e.value) == "cart.total: expected Δ +20, got Δ +15 (0 → 15)"
+        assert isinstance(e.value.__cause__, ChangeWarning)
+
+    @pytest.mark.filterwarnings("error::pytest_changes.ChangeWarning")
+    def test_outer_pass_lets_the_warning_through(self):
+        cart, box = Cart(), [self.NoEq()]
+        with (
+            pytest.raises(ChangeWarning, match="couldn't fully copy NoEq"),
+            changes(cart, "total", by=20),
+            changes(lambda: box[0]),
+        ):
+            cart.total += 20
+            box[0] = self.NoEq()

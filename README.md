@@ -163,7 +163,7 @@ A `ChangeWarning` flags two things:
 
 A test that fails stays quiet, so the warning never hides the real failure.
 
-Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
+Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures. In a stacked `with`, the other contexts still check, and a failure is chained from the warning.
 
 A context can be reused, one `with` block at a time. Entering one that is already in a block raises `RuntimeError`.
 

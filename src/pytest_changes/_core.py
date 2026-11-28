@@ -173,8 +173,8 @@ class ChangeContext:
     ) -> None:
         __tracebackhide__ = True
         self._active = False
-        # an inner context's failure isn't the block raising: check, and merge into it
-        if exc is not None and not isinstance(exc, ChangeAssertionError):
+        # an inner context's failure or warning (under -W error) isn't the block raising
+        if exc is not None and not isinstance(exc, ChangeAssertionError | ChangeWarning):
             self._after_unset = "it wasn't read because the block raised"
             error = type(exc).__name__
             self._unchecked = (
@@ -196,10 +196,12 @@ class ChangeContext:
             return
         if hint is not None:
             detail += "\n" + hint
-        if exc is not None:
+        if isinstance(exc, ChangeAssertionError):
             # inner contexts exit first, so prepending keeps source order
             exc.failures.insert(0, (self.label, detail))
             return
+        if exc is not None:
+            raise ChangeAssertionError(self.label, detail) from exc
         raise ChangeAssertionError(self.label, detail)
 
     def _copy_hint(self) -> str | None:
