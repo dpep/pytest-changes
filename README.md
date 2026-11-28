@@ -78,8 +78,6 @@ with unchanged(audit, "count"):
     audit.read()
 ```
 
-`by=0` raises `TypeError`: use `unchanged()` instead.
-
 #### Error paths
 If the block raises, the check is skipped and the exception propagates untouched. To check what a failed operation leaves behind, put the expectation outside `pytest.raises`:
 ```python

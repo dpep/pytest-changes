@@ -81,21 +81,27 @@ class TestBy:
         with changes(counter, "value", by=-1):
             counter.value -= 1
 
-    @pytest.mark.parametrize("zero", [0, 0.0, Decimal(0)], ids=repr)
-    def test_zero_raises_at_construction(self, counter, zero):
-        with pytest.raises(TypeError) as e:
-            changes(counter, "value", by=zero)
-        assert str(e.value) == f"changes() with by={zero!r} asserts no change; use unchanged()"
-
     @pytest.mark.parametrize(
         ("start", "by"),
-        [(0, pytest.approx(0, abs=1)), (0, mock.ANY), (timedelta(0), timedelta(0))],
-        ids=["approx", "ANY", "timedelta"],
+        [
+            (0, 0),
+            (0.0, 0.0),
+            (Decimal(0), Decimal(0)),
+            (0, pytest.approx(0, abs=1)),
+            (0, mock.ANY),
+            (timedelta(0), timedelta(0)),
+        ],
+        ids=repr,
     )
-    def test_non_numbers_that_equal_zero_are_allowed(self, start, by):
+    def test_zero_passes_when_nothing_changed(self, start, by):
         box = Counter(start)
         with changes(box, "value", by=by):
             pass
+
+    def test_zero_fails_when_it_changed(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by=0):
+            counter.value += 1
+        assert message(e) == "counter.value: expected Δ +0, got Δ +1 (0 → 1)"
 
     def test_neither_sized_nor_subtractable(self):
         user = Counter(object())

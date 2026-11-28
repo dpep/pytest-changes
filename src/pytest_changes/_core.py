@@ -58,8 +58,6 @@ class ChangeContext:
             raise TypeError("changes() cannot combine to and by")
         if isinstance(by, range) and not by:
             raise ValueError(f"changes() with by={by!r} can never pass: {by!r} is empty")
-        if isinstance(by, numbers.Number) and by == 0:
-            raise TypeError(f"changes() with by={by!r} asserts no change; use unchanged()")
 
         self._get = _resolve_getter(getter, attr)
         self._site = _label.call_site()
