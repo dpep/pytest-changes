@@ -8,7 +8,7 @@ import pytest
 
 from pytest_changes import ChangeAssertionError, changes, unchanged
 
-# the block raises inside pytest.raises, so the plugin warns when the test returns
+# the block or getter raises inside pytest.raises, so the plugin warns when the test returns
 UNCHECKED = pytest.mark.filterwarnings("ignore::pytest_changes.ChangeWarning")
 
 
@@ -412,12 +412,14 @@ class TestGetter:
         with pytest.raises(TypeError, match="callable"):
             changes(counter)
 
+    @UNCHECKED
     def test_getter_error_before_the_block_names_the_label(self):
         with pytest.raises(ZeroDivisionError) as e, changes(lambda: 1 / 0, label="ratio"):
             pass
         assert "ratio" in e.value.__notes__[0]
         assert "before the block" in e.value.__notes__[0]
 
+    @UNCHECKED
     def test_getter_error_after_the_block(self):
         state = {"ok": True}
         with pytest.raises(KeyError) as e, changes(lambda: state["ok"], label="state"):

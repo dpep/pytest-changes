@@ -152,3 +152,46 @@ class TestWhereBuilt:
         result = pytester.runpytest_subprocess("-W", "error::pytest_changes.ChangeWarning")
         result.assert_outcomes(passed=7, failed=1)
         assert "ChangeWarning" not in result.stdout.str()
+
+
+GETTER_RAISED = """
+    import pytest
+    from pytest_changes import changes, unchanged
+
+    def test_before():
+        store = {}
+        with pytest.raises(KeyError), unchanged(lambda: store["count"]):
+            pass
+
+    def test_after():
+        store = {"count": 1}
+        with pytest.raises(KeyError), changes(lambda: store["count"], by=1):
+            del store["count"]
+
+    def test_failing_stays_quiet():
+        store = {}
+        with unchanged(lambda: store["count"]):
+            pass
+"""
+
+
+class TestGetterRaised:
+    def test_warns_that_the_getter_raised(self, pytester):
+        pytester.makepyfile(GETTER_RAISED)
+        result = pytester.runpytest_subprocess()
+        result.assert_outcomes(passed=2, failed=1, warnings=2)
+        # [[] matches a literal [ in fnmatch
+        result.stdout.fnmatch_lines(
+            [
+                (
+                    "*.py:6: ChangeWarning: store[[]'count']: wasn't checked because the getter "
+                    "raised KeyError before the block: make the getter return a value before "
+                    "and after the block"
+                ),
+                (
+                    "*.py:11: ChangeWarning: store[[]'count']: wasn't checked because the getter "
+                    "raised KeyError after the block: make the getter return a value before "
+                    "and after the block"
+                ),
+            ]
+        )

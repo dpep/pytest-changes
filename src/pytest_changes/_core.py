@@ -75,19 +75,16 @@ class ChangeContext:
         self._after_unset = "it's read when the with block exits"
         self._entered = False
         self._active = False
-        self._skipped_by: str | None = None
+        # why a block wasn't checked: the end of "wasn't checked because ..."
+        self._unchecked: str | None = None
         _plugin.track(self)
 
     def warn_if_unchecked(self) -> None:
         """Called by the plugin when a test returns: like an un-awaited coroutine, it checked nothing."""
         if not self._entered:
             message = f"{self._name}() was never entered, so it asserts nothing: use it in a with statement"
-        elif self._skipped_by is not None:
-            error = self._skipped_by
-            message = (
-                f"{self.label}: wasn't checked because the block raised {error}: put the "
-                f"expectation outside pytest.raises: with {self._name}(...), pytest.raises({error}):"
-            )
+        elif self._unchecked is not None:
+            message = f"{self.label}: wasn't checked because {self._unchecked}"
         else:
             return
         warnings.warn_explicit(message, ChangeWarning, *_label.location(self._site))
@@ -176,7 +173,11 @@ class ChangeContext:
         # an inner context's failure isn't the block raising: check, and merge into it
         if exc is not None and not isinstance(exc, ChangeAssertionError):
             self._after_unset = "it wasn't read because the block raised"
-            self._skipped_by = type(exc).__name__
+            error = type(exc).__name__
+            self._unchecked = (
+                f"the block raised {error}: put the expectation outside pytest.raises: "
+                f"with {self._name}(...), pytest.raises({error}):"
+            )
             return
 
         self._after = self._read("after the block")
@@ -219,6 +220,11 @@ class ChangeContext:
             return self._get()
         except Exception as e:
             e.add_note(f"raised by the getter for {self.label} {when}")
+            # only a test that caught it returns to see this, as with a block that raised
+            self._unchecked = (
+                f"the getter raised {type(e).__name__} {when}: "
+                "make the getter return a value before and after the block"
+            )
             raise
 
     def _check(self) -> str | None:
