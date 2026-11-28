@@ -19,7 +19,8 @@ def pytest_unconfigure(config: pytest.Config) -> None:
     _configs.remove(config)
 
 
-# contexts constructed by each running test function, innermost (pytester) run last
+# contexts constructed by each running test, from setup through the call; innermost
+# (pytester) run last
 _constructed: list[list[Any]] = []
 
 
@@ -29,17 +30,28 @@ def track(context: Any) -> None:
 
 
 @pytest.hookimpl(wrapper=True)
-def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> Any:
-    contexts: list[Any] = []
-    _constructed.append(contexts)
-    try:
-        result = yield
-    finally:
-        _constructed.pop()
-    # only when the test body returned: a test that raised never reached its with lines
-    for context in contexts:
-        context.warn_if_unchecked()
+def pytest_runtest_setup(item: pytest.Item) -> Any:
+    _constructed.append([])
+    return (yield)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Any:
+    __tracebackhide__ = True
+    result = yield
+    # only when the test returned: a test that raised never reached its with lines.
+    # unittest records failures on the item instead of raising them
+    if not getattr(item, "_excinfo", None):
+        for context in _constructed[-1]:
+            context.warn_if_unchecked()
     return result
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_teardown(item: pytest.Item) -> Any:
+    # teardown runs whenever setup did, even when setup or the call failed
+    _constructed.pop()
+    return (yield)
 
 
 _LIMIT = 40

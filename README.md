@@ -134,7 +134,7 @@ changes(lambda: id(account))  # if identity really is what you mean
 
 The same goes for ORM models whose `==` compares primary keys: read the field, as in `changes(lambda: User.objects.get(pk=1).status)`. Values whose `==` doesn't return a bool, such as numpy arrays, raise `TypeError`: return a comparable value, as in `changes(lambda: a.tolist())`.
 
-When a test returns, each `changes()` or `unchanged()` it made that didn't run its check, because it was never entered or because the block raised, emits a `ChangeWarning` at the line that made it. A test that fails stays quiet, so the warning never hides the real failure. Each one can be entered once. Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
+When a test returns, each `changes()` or `unchanged()` made during it (fixtures and `setUp` included) that didn't run its check, because it was never entered or because the block raised, emits a `ChangeWarning` at the line that made it. A test that fails stays quiet, so the warning never hides the real failure. Each one can be entered once. Run with `-W error::pytest_changes.ChangeWarning` to turn these warnings into failures.
 
 For async code, use a plain `with` around the `await`:
 ```python
