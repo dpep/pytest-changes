@@ -24,6 +24,8 @@ class ChangeAssertionError(AssertionError):
     def __init__(self, label: str, detail: str):
         super().__init__()
         self.failures: list[tuple[str, str]] = [(label, detail)]
+        # the exception the block raised, if any; outer stacked changes() then skip their check
+        self._block_error: BaseException | None = None
 
     def __str__(self) -> str:
         if len(self.failures) == 1:
@@ -112,21 +114,32 @@ class ChangeContext:
         tb: TracebackType | None,
     ) -> None:
         __tracebackhide__ = True
-        if exc is not None and not isinstance(exc, ChangeAssertionError):
+        if isinstance(exc, ChangeAssertionError):
+            block_error = exc._block_error
+        elif exc is None or isinstance(exc, Exception):
+            block_error = exc
+        else:
+            return  # KeyboardInterrupt, pytest.skip and the like: the test is over
+        # a block that raised may not have made its change, but it must not have made others
+        if block_error is not None and self._expect_change:
             return
 
-        self._after = self._read("after the block completed")
+        self._after = self._read(
+            "after the block raised" if block_error else "after the block completed"
+        )
         try:
             detail = self._check()
         except Incomparable:
-            raise self._incomparable(self._after) from None
+            raise self._incomparable(self._after) from block_error
         if detail is None:
             return
-        if exc is not None:
+        if isinstance(exc, ChangeAssertionError):
             # inner contexts exit first, so prepending keeps source order
             exc.failures.insert(0, (self.label, detail))
             return
-        raise ChangeAssertionError(self.label, detail)
+        error = ChangeAssertionError(self.label, detail)
+        error._block_error = block_error
+        raise error from block_error
 
     def _incomparable(self, value: Any) -> TypeError:
         return TypeError(
