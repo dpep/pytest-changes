@@ -32,7 +32,6 @@ changes = "pytest_changes._plugin"
 [dependency-groups]
 dev = [
   "hypothesis",
-  "pytest >= 8.2",
   "ruff",
 ]
 
