@@ -31,8 +31,8 @@ Requires Python 3.11+ and pytest 8.4+.
 ### Usage
 Pass a zero-argument getter. With no constraint, the value just has to change:
 ```python
-with changes(lambda: len(cart.items)):
-    cart.add(item)
+with changes(lambda: cart.status):
+    cart.checkout()
 ```
 
 For an attribute, pass the object and the attribute name as a shorthand:
@@ -41,25 +41,33 @@ with changes(cart, "total", by=20):
     cart.add(item)
 ```
 
-Constrain the change with `to` (the end value, which must differ from the start) or `by` (`after - before`). They can't be combined:
+Constrain the change with `to` (the end value, which must differ from the start) or `by` (the difference). They can't be combined:
 ```python
 changes(user, "status", to="active")
 changes(cart, "total", by=20)
 ```
 
-Values compare with `==`, expected value first, so matchers work:
+For anything with a length, `by` counts items:
+```python
+with changes(lambda: cart.items, by=1):
+    cart.add(item)
+```
+
+Values compare with `==`, expected value first, so matchers such as `pytest.approx` or dirty-equals work as `by` and `to`:
 ```python
 changes(account, "balance", by=pytest.approx(0.1))
 ```
 
-For a bound, check the delta after the block:
+For a range, pass one. Like `in`, the stop is excluded, so this passes for 1, 2 or 3 new jobs:
 ```python
-with changes(lambda: len(queue)) as c:
+with changes(lambda: queue, by=range(1, 4)):
     queue.push_many(jobs)
-assert c.delta >= 1
+```
+```
+E       pytest_changes.ChangeAssertionError: queue: expected Δ in 1..3, got Δ +4 (len 0 → 4)
 ```
 
-`c.before` and `c.after` hold the values read on entering and leaving the block, and `c.delta` is `after - before`. It raises `TypeError` when they can't be subtracted.
+With `as c`, `c.before` and `c.after` hold the values read on entering and leaving the block. `c.delta` is `len(after) - len(before)` for anything with a length, else `after - before`, and raises `TypeError` when neither works.
 
 #### Unchanged
 Assert that nothing changed:
@@ -70,25 +78,29 @@ with unchanged(audit, "count"):
     audit.read()
 ```
 
-`by=0` raises `TypeError`: use `unchanged()` instead.
+`by=0`, or a matcher equal to 0 such as `pytest.approx(0)`, raises `TypeError`: use `unchanged()` instead.
 
-`unchanged` checks even when the block raises. Pair it with `pytest.raises` to catch an operation that fails but still leaves a mess:
+#### When the block raises
+`changes` and `unchanged` still check, so pair them with `pytest.raises` to assert what a failed operation did, and didn't, leave behind:
 ```python
 with pytest.raises(ValueError), unchanged(lambda: account.balance):
     account.withdraw(500)
+
+with pytest.raises(LoginError), changes(lambda: user.failed_attempts, by=1):
+    user.login("wrong password")
 ```
 ```
-E       pytest_changes.ChangeAssertionError: account.balance: expected no change, got 100 → -400 (Δ -500)
+E       pytest_changes.ChangeAssertionError: account.balance: expected no change, got 100 → -400
 ```
 
-`changes` skips its check when the block raises, since the operation didn't finish.
+A failed check is chained from the block's exception. A passing check lets the exception through for `pytest.raises` to catch.
 
 #### Stacking
 Stack expectations in one `with`, and every failure is reported:
 ```python
 with (
     changes(cart, "total", by=20),
-    changes(lambda: len(cart.items), by=1),
+    changes(cart, "items", by=1),
     unchanged(audit, "count"),
 ):
     cart.add(item)
@@ -96,7 +108,7 @@ with (
 ```
 E       pytest_changes.ChangeAssertionError: 2 change expectations failed
 E         ✗ cart.total   expected Δ +20, got Δ +15 (0 → 15)
-E         ✗ audit.count  expected no change, got 4 → 5 (Δ +1)
+E         ✗ audit.count  expected no change, got 4 → 5
 ```
 
 Failures name the expression as you wrote it. Pass `label=` to name it yourself:
