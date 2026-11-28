@@ -114,7 +114,7 @@ class ChangeContext:
 
     @property
     def delta(self) -> Any:
-        """Items added for lists, tuples, sets and dicts, signed counts for a Counter, else `after - before`."""
+        """Items added to a list, tuple, set or dict; a Counter's signed counts; else `after - before`."""
         return self._delta("delta")[0]
 
     def _delta(self, needed_by: str) -> tuple[Any, bool]:
