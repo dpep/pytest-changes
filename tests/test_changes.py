@@ -162,13 +162,12 @@ class TestByRange:
             lib.value = ["a", "b", "c"]
 
     @pytest.mark.parametrize("delta", [1.5, 2.0, Decimal(2)], ids=repr)
-    def test_needs_whole_number_deltas(self, delta):
+    def test_needs_integer_deltas(self, delta):
         balance = Counter(10)
         with pytest.raises(TypeError) as e, changes(balance, "value", by=range(1, 3)):
             balance.value += delta
         assert str(e.value) == (
-            "balance.value: by=range(1, 3) needs whole-number deltas; "
-            "for other values assert on c.delta"
+            "balance.value: by=range(1, 3) needs integer deltas; for other values assert on c.delta"
         )
 
     def test_empty_raises_at_construction(self, counter):

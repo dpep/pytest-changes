@@ -272,8 +272,7 @@ class ChangeContext:
         if isinstance(by, range) and not isinstance(delta, numbers.Integral):
             # an interval check would read as a contradiction: "Δ in 1..2, got Δ +1.5"
             raise TypeError(
-                f"{self.label}: by={by!r} needs whole-number deltas; "
-                "for other values assert on c.delta"
+                f"{self.label}: by={by!r} needs integer deltas; for other values assert on c.delta"
             )
         if delta in by if isinstance(by, range) else equal(by, delta):
             return None
