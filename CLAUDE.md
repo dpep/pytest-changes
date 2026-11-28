@@ -10,7 +10,7 @@ Design brief: [Build brief: Python change-block assertions](https://claude.ai/ar
 - A pytest plugin: depend on pytest and lean on its machinery (assertion diffs, traceback hiding) rather than rebuilding it.
 - Failure messages are the product. Every message shape has an exact-string test, so change wording on purpose and test it.
 - Compare as `expected == actual`, so matchers (`pytest.approx`, dirty-equals) run their own `__eq__`.
-- When the block raises an `Exception`, `changes` skips its check and `unchanged` still checks; a failure raises `ChangeAssertionError` chained from the block's exception, else that exception propagates untouched. Anything else (`KeyboardInterrupt`, `pytest.skip`) skips both.
+- On an `Exception` from the block, both `changes` and `unchanged` still check; a failed check raises `ChangeAssertionError` chained from it, and a passing check lets the original propagate. Anything else (`KeyboardInterrupt`, `pytest.skip`) skips the check.
 - Stacked contexts merge their failures into one `ChangeAssertionError`.
 - A passing block never reads source: labels resolve on first use.
 - Library frames set `__tracebackhide__` so pytest tracebacks end at the user's `with` line.

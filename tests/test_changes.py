@@ -331,22 +331,41 @@ class TestInspect:
             with pytest.raises(AttributeError, match="read when the with block exits"):
                 c.delta  # noqa: B018
 
-    def test_after_is_unset_when_the_block_raises(self, counter):
+    def test_after_is_read_when_the_block_raises(self, counter):
         with pytest.raises(ValueError), changes(counter, "value") as c:
+            counter.value = 1
             raise ValueError
-        assert c.before == 0
+        assert (c.before, c.after) == (0, 1)
+
+    def test_after_is_unset_when_the_test_is_skipped(self, counter):
+        with pytest.raises(pytest.skip.Exception), changes(counter, "value") as c:
+            pytest.skip("not today")
         assert not hasattr(c, "after")
 
 
 class TestBlockErrors:
-    def test_other_exceptions_pass_through_unchecked(self, counter):
-        with pytest.raises(ValueError), changes(counter, "value", by=1):
+    def test_change_made_lets_the_error_through_untouched(self, counter):
+        error = ValueError()
+        with pytest.raises(ValueError) as e, changes(counter, "value", by=1):
+            counter.value += 1
+            raise error
+        assert e.value is error
+
+    def test_change_missing_fails_chained_from_the_block_error(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by=1):
             raise ValueError
+        assert message(e) == "counter.value: expected Δ +1, did not change (stayed 0)"
+        assert isinstance(e.value.__cause__, ValueError)
 
     def test_plain_assertion_errors_pass_through(self, counter):
         with pytest.raises(AssertionError) as e, changes(counter, "value", by=1):
+            counter.value += 1
             raise AssertionError("mine")
         assert type(e.value) is AssertionError
+
+    def test_control_flow_exceptions_skip_the_check(self, counter):
+        with pytest.raises(pytest.skip.Exception), changes(counter, "value", by=1):
+            pytest.skip("not today")
 
 
 class TestInvalidCombos:
