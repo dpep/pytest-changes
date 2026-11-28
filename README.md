@@ -57,7 +57,7 @@ changes(cart, "total", by=20)
 ```
 
 ### Collections
-For lists, tuples, sets and dicts, Δ counts items; everything else, including types with their own `-` such as a `Counter` or a vector, is compared with `after - before`. A string raises `TypeError` rather than counting characters, so a counter stored as `"9"` can't pass `by=1` by luck: return `int(...)` or `len(...)` from the getter.
+For lists, tuples, sets and dicts, Δ counts items. A `Counter`'s Δ is the signed change in each count, as `Counter.subtract` computes it, so a decrease shows. Everything else, including types with their own `-` such as a vector, is compared with `after - before`. A string raises `TypeError` rather than counting characters, so a counter stored as `"9"` can't pass `by=1` by luck: return `int(...)` or `len(...)` from the getter.
 ```python
 with changes(lambda: cart.items, by=1):
     cart.add(item)
@@ -90,7 +90,7 @@ with changes(cart, "total") as c:
 assert c.delta == 15
 ```
 
-`c.delta` follows the same rule as `by`: items added for lists, tuples, sets and dicts, else `after - before`. It raises `TypeError` when the values don't subtract.
+`c.delta` follows the same rule as `by`: items added for lists, tuples, sets and dicts, signed counts for a `Counter`, else `after - before`. It raises `TypeError` when the values don't subtract.
 
 
 ## Stacking

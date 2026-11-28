@@ -4,6 +4,7 @@ import functools
 import numbers
 import types
 import warnings
+from collections import Counter
 from collections.abc import Callable
 from types import TracebackType
 from typing import Any, Self
@@ -116,13 +117,18 @@ class ChangeContext:
 
     @property
     def delta(self) -> Any:
-        """How many items were added for lists, tuples, sets and dicts, else `after - before`."""
+        """Items added for lists, tuples, sets and dicts, signed counts for a Counter, else `after - before`."""
         return self._delta("delta")[0]
 
     def _delta(self, needed_by: str) -> tuple[Any, bool]:
         """The delta, and whether it counts items."""
         __tracebackhide__ = True
         after, before = self.after, self.before
+        if isinstance(after, Counter) and isinstance(before, Counter):
+            # Counter's `-` drops counts at or below zero, so it can't say what decreased
+            delta = after.copy()
+            delta.subtract(before)
+            return delta, False
         if _counts_items(after) and _counts_items(before):
             return len(after) - len(before), True
         try:
@@ -343,7 +349,7 @@ _COLLECTIONS = (list, tuple, set, frozenset, dict)
 
 
 def _counts_items(value: Any) -> bool:
-    # a type that defines its own `-` (Counter, a vector) means it, so subtraction wins
+    # a type that defines its own `-` (a vector) means it, so subtraction wins
     for base in _COLLECTIONS:
         if isinstance(value, base):
             return getattr(type(value), "__sub__", None) is getattr(base, "__sub__", None)

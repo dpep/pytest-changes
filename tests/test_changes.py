@@ -233,10 +233,24 @@ class TestByLength:
         with changes(box, "value", by=2):
             box.value = ("a", "b", "c")
 
-    def test_any_other_by_subtracts(self):
+    def test_counters_subtract_signed_counts(self):
         stock = Counter(collections.Counter(apple=1))
         with changes(stock, "value", by=collections.Counter(apple=2)):
             stock.value = collections.Counter(apple=3)
+
+    def test_counter_decreases_count(self):
+        # Counter's own `-` drops counts at or below zero, so it would hide the pears
+        inv = collections.Counter(apples=1, pears=5)
+        with (
+            pytest.raises(ChangeAssertionError) as e,
+            changes(lambda: inv, by=collections.Counter(apples=1)),
+        ):
+            inv["apples"] += 1
+            inv["pears"] -= 5
+        assert message(e) == (
+            "inv: expected Δ Counter({'apples': 1}), got Δ Counter({'apples': 1, 'pears': -5}) "
+            "(Counter({'pears': 5, 'apples': 1}) → Counter({'apples': 2, 'pears': 0}))"
+        )
 
     def test_vectors_subtract(self):
         pos = Counter(Vec(0, 0))
@@ -430,6 +444,12 @@ class TestInspect:
             tags.value = {"a", "b"}
             pos.value = Vec(3, 4)
         assert (t.delta, p.delta) == (1, Vec(3, 4))
+
+    def test_counter_delta_keeps_decreases(self):
+        inv = collections.Counter(apples=3)
+        with changes(lambda: inv) as c:
+            inv["apples"] -= 2
+        assert c.delta == collections.Counter(apples=-2)
 
     def test_delta_of_values_neither_sized_nor_subtractable_raises(self):
         shelf = Counter(None)
