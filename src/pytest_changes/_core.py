@@ -59,7 +59,7 @@ class ChangeContext:
     ):
         if to is not MISSING and by is not MISSING:
             raise TypeError("changes() cannot combine to and by")
-        if isinstance(by, numbers.Number) and by == 0:
+        if by is not MISSING and equal(by, 0):
             raise TypeError(f"changes() with by={by!r} asserts no change; use unchanged()")
 
         self._get = _resolve_getter(getter, attr)

@@ -81,6 +81,10 @@ class TestBy:
             changes(counter, "value", by=zero)
         assert str(e.value) == f"changes() with by={zero} asserts no change; use unchanged()"
 
+    def test_matcher_for_zero_raises_at_construction(self, counter):
+        with pytest.raises(TypeError, match=r"asserts no change; use unchanged\(\)"):
+            changes(counter, "value", by=pytest.approx(0))
+
     def test_neither_sized_nor_subtractable(self):
         user = Counter(object())
         with pytest.raises(TypeError) as e, changes(user, "value", by=1):

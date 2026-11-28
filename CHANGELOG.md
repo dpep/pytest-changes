@@ -3,7 +3,7 @@
 ## Unreleased
 - `changes` and `unchanged` context managers. Pass a getter, or an object and attribute name; both are positional-only. Constrain a change with `to` or `by`, which can't be combined.
 - For a bound, check the delta after the block: `assert c.delta >= 1`.
-- `by=0` raises `TypeError`: use `unchanged()`.
+- `by=0`, or anything equal to 0 such as `pytest.approx(0)`, raises `TypeError`: use `unchanged()`.
 - The delta is `after - before` for numbers, and `len(after) - len(before)` for anything with a length (lists, sets, dicts, strings): `changes(lambda: lib.books, by=1)` passes when one book was added. Failures show the lengths: `expected Δ +1, got Δ +2 (len 3 → 5)`.
 - `c.before`, `c.after` and `c.delta` expose the values. `c.delta` follows the same rule, and raises `TypeError` for values that have no length and can't be subtracted. `c.after` raises `AttributeError` until the block exits.
 - When the block raises an `Exception`, `changes` and `unchanged` still check: a failed check raises `ChangeAssertionError` chained from the block's exception, and a passing check lets that exception propagate untouched, so `with pytest.raises(LoginError), changes(lambda: user.failed_attempts, by=1):` asserts both. `KeyboardInterrupt`, `pytest.skip` and other non-`Exception` errors skip the check.
