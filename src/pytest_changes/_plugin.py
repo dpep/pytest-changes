@@ -45,11 +45,12 @@ def compare(actual: Any, expected: Any) -> tuple[Callable[[Any], str], list[str]
             while explanation and not explanation[0].strip():
                 explanation.pop(0)
             if explanation:
-                return _short_repr, explanation
+                return short_repr, explanation
     return repr, []
 
 
-def _short_repr(value: Any) -> str:
+def short_repr(value: Any) -> str:
+    """`repr`, eliding the middle of long values."""
     # mirrors pytest's saferepr: elide the middle, so both ends stay visible
     text = repr(value)
     if len(text) <= _LIMIT:

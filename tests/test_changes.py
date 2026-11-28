@@ -1,3 +1,6 @@
+from datetime import timedelta
+from decimal import Decimal
+
 import pytest
 
 from pytest_changes import ChangeAssertionError, changes, unchanged
@@ -48,7 +51,14 @@ class TestTo:
         user = Counter("active")
         with pytest.raises(ChangeAssertionError) as e, changes(user, "value", to="active"):
             pass
-        assert message(e) == "user.value: expected → 'active', stayed 'active'"
+        assert (
+            message(e) == "user.value: expected to change to 'active', but it was already 'active'"
+        )
+
+    def test_stayed_away_from_the_target(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", to=20):
+            pass
+        assert message(e) == "counter.value: expected → 20, stayed 0"
 
 
 class TestBy:
@@ -108,6 +118,59 @@ class TestBy:
         total = Counter(0.1)
         with changes(total, "value", by=pytest.approx(0.2)):
             total.value += 0.2
+
+
+class TestMessages:
+    def test_stayed_shortens_long_values(self):
+        items = list(range(30))
+        with pytest.raises(ChangeAssertionError) as e, changes(lambda: items):
+            pass
+        assert (
+            message(e)
+            == "items: expected to change, stayed [0, 1, 2, 3, 4, 5,...5, 26, 27, 28, 29]"
+        )
+
+    def test_by_shortens_long_values(self):
+        big = Counter(10**50)
+        with pytest.raises(ChangeAssertionError) as e, changes(big, "value", by=1):
+            big.value += 2
+        assert message(e) == (
+            "big.value: expected Δ +1, got Δ +2 "
+            "(100000000000000000...000000000000000000 → 100000000000000000...000000000000000002)"
+        )
+
+    def test_by_shortens_long_values_that_stayed(self):
+        big = Counter(10**50)
+        with pytest.raises(ChangeAssertionError) as e, changes(big, "value", by=1):
+            pass
+        assert message(e) == (
+            "big.value: expected Δ +1, did not change (stayed 100000000000000000...000000000000000000)"
+        )
+
+    def test_timedelta_deltas_read_as_durations(self):
+        elapsed = Counter(timedelta(0))
+        with (
+            pytest.raises(ChangeAssertionError) as e,
+            changes(elapsed, "value", by=timedelta(hours=1)),
+        ):
+            elapsed.value += timedelta(hours=2)
+        assert message(e) == (
+            "elapsed.value: expected Δ 1:00:00, got Δ 2:00:00 "
+            "(datetime.timedelta(0) → datetime.timedelta(seconds=7200))"
+        )
+
+    def test_decimal_deltas_are_signed(self):
+        price = Counter(Decimal("1.00"))
+        with pytest.raises(ChangeAssertionError) as e, changes(price, "value", by=Decimal("0.50")):
+            price.value += Decimal("0.25")
+        assert message(e) == (
+            "price.value: expected Δ +0.50, got Δ +0.25 (Decimal('1.00') → Decimal('1.25'))"
+        )
+
+    def test_string_expectations_keep_their_quotes(self, counter):
+        with pytest.raises(ChangeAssertionError) as e, changes(counter, "value", by="1"):
+            counter.value += 1
+        assert message(e) == "counter.value: expected Δ '1', got Δ +1 (0 → 1)"
 
 
 class TestGetter:

@@ -225,10 +225,13 @@ class ChangeContext:
         if self._to is not MISSING:
             if changed and equal(self._to, after):
                 return None
+            if not changed and equal(self._to, after):
+                short = _plugin.short_repr
+                return f"expected to change to {short(self._to)}, but it was already {short(after)}"
             r, explanation = _plugin.compare(after, self._to)
             return _explained(f"expected → {r(self._to)}, {self._actual(changed, r)}", explanation)
 
-        return None if changed else f"expected to change, stayed {before!r}"
+        return None if changed else f"expected to change, stayed {_plugin.short_repr(before)}"
 
     def _check_delta(self) -> str | None:
         __tracebackhide__ = True
@@ -246,8 +249,9 @@ class ChangeContext:
             return None
         expected = f"Δ {_signed(self._by)}"
         if not equal(self.before, self.after):
-            return f"expected {expected}, got Δ {_signed(delta)} ({self.before!r} → {self.after!r})"
-        return f"expected {expected}, did not change (stayed {self.before!r})"
+            transition = f"{_plugin.short_repr(self.before)} → {_plugin.short_repr(self.after)}"
+            return f"expected {expected}, got Δ {_signed(delta)} ({transition})"
+        return f"expected {expected}, did not change (stayed {_plugin.short_repr(self.before)})"
 
     def _actual(self, changed: bool, r: Callable[[Any], str]) -> str:
         return f"got {self._transition(r)}" if changed else f"stayed {r(self.before)}"
@@ -308,12 +312,13 @@ def _subtraction(after: Any, before: Any) -> str:
 
 
 def _signed(value: Any) -> str:
+    # deltas read as amounts (+5, 1:00:00); strings keep quotes, since the type is the point
     if isinstance(value, numbers.Number) and not isinstance(value, bool):
         try:
             return format(value, "+")
         except (TypeError, ValueError):
             pass
-    return repr(value)
+    return repr(value) if isinstance(value, (str, bytes)) else str(value)
 
 
 def _explained(headline: str, explanation: list[str]) -> str:
